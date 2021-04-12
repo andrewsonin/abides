@@ -142,12 +142,12 @@ class TradingAgent(FinancialAgent):
     mytype = self.type
     gain = cash - self.starting_cash
 
-    if mytype in self.kernel.meanResultByAgentType:
-      self.kernel.meanResultByAgentType[mytype] += gain
-      self.kernel.agentCountByType[mytype] += 1
+    if mytype in self.kernel.mean_result_by_agent_type:
+      self.kernel.mean_result_by_agent_type[mytype] += gain
+      self.kernel.agent_count_by_type[mytype] += 1
     else:
-      self.kernel.meanResultByAgentType[mytype] = gain
-      self.kernel.agentCountByType[mytype] = 1
+      self.kernel.mean_result_by_agent_type[mytype] = gain
+      self.kernel.agent_count_by_type[mytype] = 1
 
 
   # Simulation participation messages.

@@ -57,7 +57,7 @@ class OrderBook:
             return
 
         # Add the order under index 0 of history: orders since the most recent trade.
-        self.history[0][order.order_id] = {'entry_time': self.owner.currentTime,
+        self.history[0][order.order_id] = {'entry_time': self.owner.current_time,
                                            'quantity': order.quantity, 'is_buy_order': order.is_buy_order,
                                            'limit_price': order.limit_price, 'transactions': [],
                                            'modifications': [],
@@ -142,7 +142,7 @@ class OrderBook:
             # Finally, log the full depth of the order book, ONLY if we have been requested to store the order book
             # for later visualization.  (This is slow.)
             if self.owner.book_freq is not None:
-                row = {'QuoteTime': self.owner.currentTime}
+                row = {'QuoteTime': self.owner.current_time}
                 for quote, volume in self.getInsideBids():
                     row[quote] = -volume
                     self.quotes_seen.add(quote)
@@ -154,7 +154,7 @@ class OrderBook:
                     row[quote] = volume
                     self.quotes_seen.add(quote)
                 self.book_log.append(row)
-        self.last_update_ts = self.owner.currentTime
+        self.last_update_ts = self.owner.current_time
         self.prettyPrint()
 
     def handleMarketOrder(self, order):
@@ -242,7 +242,7 @@ class OrderBook:
             # out one, possibly truncating to the maximum history length.
 
             # The incoming order is guaranteed to exist under index 0.
-            self.history[0][order.order_id]['transactions'].append((self.owner.currentTime, order.quantity))
+            self.history[0][order.order_id]['transactions'].append((self.owner.current_time, order.quantity))
 
             # The pre-existing order may or may not still be in the recent history.
             for idx, orders in enumerate(self.history):
@@ -250,7 +250,7 @@ class OrderBook:
 
                 # Found the matched order in history.  Update it with this transaction.
                 self.history[idx][matched_order.order_id]['transactions'].append(
-                    (self.owner.currentTime, matched_order.quantity))
+                    (self.owner.current_time, matched_order.quantity))
 
             # Return (only the executed portion of) the matched order.
             return matched_order
@@ -331,7 +331,7 @@ class OrderBook:
 
                             # Found the cancelled order in history.  Update it with the cancelation.
                             self.history[idx][cancelled_order.order_id]['cancellations'].append(
-                                (self.owner.currentTime, cancelled_order.quantity))
+                                (self.owner.current_time, cancelled_order.quantity))
 
                         # If the cancelled price now has no orders, remove it completely.
                         if not book[i]:
@@ -344,7 +344,7 @@ class OrderBook:
                         self.owner.sendMessage(order.agent_id,
                                                Message({"msg": "ORDER_CANCELLED", "order": cancelled_order}))
                         # We found the order and cancelled it, so stop looking.
-                        self.last_update_ts = self.owner.currentTime
+                        self.last_update_ts = self.owner.current_time
                         return
 
     def modifyOrder(self, order, new_order):
@@ -360,7 +360,7 @@ class OrderBook:
                         for idx, orders in enumerate(self.history):
                             if new_order.order_id not in orders: continue
                             self.history[idx][new_order.order_id]['modifications'].append(
-                                (self.owner.currentTime, new_order.quantity))
+                                (self.owner.current_time, new_order.quantity))
                             log_print("MODIFIED: order {}", order)
                             log_print("SENT: notifications of order modification to agent {} for order {}",
                                       new_order.agent_id, new_order.order_id)
@@ -370,7 +370,7 @@ class OrderBook:
             self.bids = book
         else:
             self.asks = book
-        self.last_update_ts = self.owner.currentTime
+        self.last_update_ts = self.owner.current_time
 
     # Get the inside bid price(s) and share volume available at each price, to a limit
     # of "depth".  (i.e. inside price, inside 2 prices)  Returns a list of tuples:
@@ -464,7 +464,7 @@ class OrderBook:
 
         #  Get transacted volume in time window
         lookback_pd = pd.to_timedelta(lookback_period)
-        window_start = self.owner.currentTime - lookback_pd
+        window_start = self.owner.current_time - lookback_pd
         executed_within_lookback_period = unrolled_transactions[unrolled_transactions['execution_time'] >= window_start]
         transacted_volume = executed_within_lookback_period['quantity'].sum()
 
@@ -537,10 +537,10 @@ class OrderBook:
         # If the global silent flag is set, skip prettyPrinting entirely, as it takes a LOT of time.
         if be_silent: return ''
 
-        book = "{} order book as of {}\n".format(self.symbol, self.owner.currentTime)
+        book = "{} order book as of {}\n".format(self.symbol, self.owner.current_time)
         book += "Last trades: simulated {:d}, historical {:d}\n".format(self.last_trade,
                                                                         self.owner.oracle.observePrice(self.symbol,
-                                                                                                       self.owner.currentTime,
+                                                                                                       self.owner.current_time,
                                                                                                        sigma_n=0,
                                                                                                        random_state=self.owner.random_state))
 
