@@ -335,7 +335,7 @@ class Kernel:
                         "currentTime:",
                         self.currentTime,
                         "messageType:",
-                        self.msg.type
+                        msg_type
                     )
 
             if self.messages.empty():
