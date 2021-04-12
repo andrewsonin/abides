@@ -1,11 +1,16 @@
 import os
 import queue
+from typing import List, Dict, Optional, Any
 
 import numpy as np
 import pandas as pd
 
 from message.Message import MessageType
 from util.util import log_print
+
+__all__ = (
+    "Kernel",
+)
 
 
 class Kernel:
@@ -34,24 +39,25 @@ class Kernel:
         "currentAgentAdditionalDelay"
     )
 
-    def __init__(self, kernel_name, random_state=None):
+    def __init__(self, kernel_name: str, random_state: np.random.RandomState) -> None:
+
         # kernel_name is for human readers only.
         self.name = kernel_name
-        self.random_state = random_state
-
-        if not random_state:
+        if not isinstance(random_state, np.random.RandomState):
             raise ValueError(
                 "A valid, seeded np.random.RandomState object is required for the Kernel",
                 self.name
             )
 
+        self.random_state = random_state
+
         # A single message queue to keep everything organized by increasing
         # delivery timestamp.
-        self.messages = queue.PriorityQueue()
+        self.messages: queue.PriorityQueue = queue.PriorityQueue()
 
         # currentTime is None until after kernelStarting() event completes
         # for all agents.  This is a pd.Timestamp that includes the date.
-        self.currentTime = None
+        self.currentTime: Optional[pd.Timestamp] = None
 
         # Timestamp at which the Kernel was created.  Primarily used to
         # create a unique log directory for this run.  Also used to
@@ -59,19 +65,19 @@ class Kernel:
         self.kernelWallClockStart = pd.Timestamp('now')
 
         # TODO: This is financial, and so probably should not be here...
-        self.meanResultByAgentType = {}
-        self.agentCountByType = {}
+        self.meanResultByAgentType: Dict[str, float] = {}
+        self.agentCountByType: Dict[str, int] = {}
 
         # The Kernel maintains a summary log to which agents can write
         # information that should be centralized for very fast access
         # by separate statistical summary programs.  Detailed event
         # logging should go only to the agent's individual log.  This
         # is for things like "final position value" and such.
-        self.summaryLog = []
+        self.summaryLog: List[Dict[str, Any]] = []
 
-        self.agents = self.custom_state = self.startTime = self.stopTime = self.seed = self.skip_log = \
-            self.oracle = self.log_dir = self.agentCurrentTimes = self.agentComputationDelays = \
-            self.agentLatencyModel = self.agentLatency = self.latencyNoise = self.currentAgentAdditionalDelay = None
+        # self.agents = self.custom_state = self.startTime = self.stopTime = self.seed = self.skip_log = \
+        #     self.oracle = self.log_dir = self.agentCurrentTimes = self.agentComputationDelays = \
+        #     self.agentLatencyModel = self.agentLatency = self.latencyNoise = self.currentAgentAdditionalDelay = None
 
         log_print("Kernel initialized: {}", self.name)
 
@@ -95,6 +101,7 @@ class Kernel:
         # agents must be a list of agents for the simulation,
         #        based on class agent.Agent
         self.agents = agents
+        # self.agents: List[Agent] = agents if agents is not None else []
 
         # Simulation custom state in a freeform dictionary.  Allows config files
         # that drive multiple simulations, or require the ability to generate
@@ -151,7 +158,7 @@ class Kernel:
         # This matrix defines the communication delay between every pair of
         # agents.
         if agentLatency is None:
-            self.agentLatency = [[defaultLatency] * len(agents)] * len(agents)
+            self.agentLatency = [[defaultLatency] * len(agents)] * len(agents)  # TODO!!! Potentially dangerous decision
         else:
             self.agentLatency = agentLatency
 
