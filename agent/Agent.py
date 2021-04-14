@@ -1,35 +1,43 @@
 from copy import deepcopy
 
+import numpy as np
 import pandas as pd
 
 from util.util import log_print
 
 
 class Agent:
-    def __init__(self, id, name, type, random_state, log_to_file=True):
+    def __init__(self,
+                 *,
+                 agent_id: int,
+                 name: str,
+                 agent_type: str,
+                 random_state: np.random.RandomState,
+                 log_to_file: bool = True) -> None:
 
-        # ID must be a unique number (usually autoincremented).
+        # ID must be a unique number (usually auto-incremented).
         # Name is for human consumption, should be unique (often type + number).
         # Type is for machine aggregation of results, should be same for all
         # agents following the same strategy (incl. parameter settings).
         # Every agent is given a random state to use for any stochastic needs.
         # This is an np.random.RandomState object, already seeded.
-        self.id = id
+        self.id = agent_id
         self.name = name
-        self.type = type
+        self.type = agent_type
         self.log_to_file = log_to_file
         self.random_state = random_state
 
         if not random_state:
-            raise ValueError("A valid, seeded np.random.RandomState object is required " +
-                             "for every agent.Agent", self.name)
-            sys.exit()
+            raise ValueError(
+                "A valid, seeded np.random.RandomState object is required for every agent.Agent",
+                self.name
+            )
 
         # Kernel is supplied via kernelInitializing method of kernel lifecycle.
         self.kernel = None
 
         # What time does the agent think it is?  Should be updated each time
-        # the agent wakes via wakeup or receiveMessage.  (For convenience
+        # the agent wakes via wakeup or receiveMessage. (For convenience
         # of reference throughout the Agent class hierarchy, NOT THE
         # CANONICAL TIME.)
         self.currentTime = None
@@ -45,7 +53,7 @@ class Agent:
         # It might, or might not, make sense to formalize these log Events
         # as a class, with enumerated EventTypes and so forth.
         self.log = []
-        self.logEvent("AGENT_TYPE", type)
+        self.logEvent("AGENT_TYPE", agent_type)
 
     ### Flow of required kernel listening methods:
     ### init -> start -> (entire simulation) -> end -> terminate
@@ -168,7 +176,6 @@ class Agent:
         self.kernel.updateAgentState(self.id, state)
 
     ### Internal methods that should not be modified without a very good reason.
-
     def __lt__(self, other):
         # Required by Python3 for this object to be placed in a priority queue.
 

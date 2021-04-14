@@ -18,6 +18,7 @@ __all__ = (
 )
 
 _one_ns_timedelta = pd.Timedelta(1)
+_one_s_timedelta = np.timedelta64(1, 's')
 _OracleType = TypeVar('_OracleType')
 
 _MESSAGE = MessageType.MESSAGE
@@ -389,7 +390,7 @@ class Kernel(Generic[_OracleType]):
             print(
                 f"Event Queue elapsed: {event_queue_wallclock_elapsed}, "
                 f"messages: {ttl_messages}, "
-                f"messages per second: {ttl_messages / (event_queue_wallclock_elapsed / (np.timedelta64(1, 's'))):0.1f}"
+                f"messages per second: {ttl_messages / (event_queue_wallclock_elapsed / _one_s_timedelta):0.1f}"
             )
             log_print("Ending sim {}", sim)
 
