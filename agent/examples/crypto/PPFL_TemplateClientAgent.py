@@ -1,6 +1,6 @@
 from agent.Agent import Agent
 from agent.examples.crypto.PPFL_ServiceAgent import PPFL_ServiceAgent
-from message.Message import Message
+from message.__init__ import Message
 from util.util import log_print
 
 from util.crypto.logReg import getWeights, reportStats

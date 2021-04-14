@@ -1,6 +1,6 @@
 from agent.Agent import Agent
 from agent.examples.SumServiceAgent import SumServiceAgent
-from message.Message import Message
+from message.__init__ import Message
 from util.util import log_print
 
 import pandas as pd

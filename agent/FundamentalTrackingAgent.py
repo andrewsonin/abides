@@ -1,7 +1,7 @@
-from agent.TradingAgent import TradingAgent
-from util.util import log_print
 import numpy as np
 import pandas as pd
+
+from agent.TradingAgent import TradingAgent
 
 
 class FundamentalTrackingAgent(TradingAgent):
@@ -27,7 +27,6 @@ class FundamentalTrackingAgent(TradingAgent):
         # self.exchangeID is set in TradingAgent.kernelStarting()
         super().kernelStarting(startTime)
         self.oracle = self.kernel.oracle
-
 
     def kernelStopping(self):
         """ Stops kernel and saves fundamental series to disk. """

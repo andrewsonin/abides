@@ -2,17 +2,15 @@
 # List of bid prices (index zero is best bid), each with a list of LimitOrders.
 # List of ask prices (index zero is best ask), each with a list of LimitOrders.
 import sys
-
-from message.Message import Message
-from util.order.LimitOrder import LimitOrder
-from util.util import log_print, be_silent
-
 from copy import deepcopy
+
 import pandas as pd
-from pandas.io.json import json_normalize
-from functools import reduce
 from scipy.sparse import dok_matrix
 from tqdm import tqdm
+
+from message import Message
+from util.order.LimitOrder import LimitOrder
+from util.util import log_print, be_silent
 
 
 class OrderBook:
@@ -169,16 +167,16 @@ class OrderBook:
 
         orderbook_side = self.getInsideAsks() if order.is_buy_order else self.getInsideBids()
 
-        limit_orders = {} # limit orders to be placed (key=price, value=quantity)
+        limit_orders = {}  # limit orders to be placed (key=price, value=quantity)
         order_quantity = order.quantity
         for price_level in orderbook_side:
             price, size = price_level[0], price_level[1]
             if order_quantity <= size:
-                limit_orders[price] = order_quantity #i.e. the top of the book has enough volume for the full order
+                limit_orders[price] = order_quantity  # i.e. the top of the book has enough volume for the full order
                 break
             else:
-                limit_orders[price] = size # i.e. not enough liquidity at the top of the book for the full order
-                                           # therefore walk through the book until all the quantities are matched
+                limit_orders[price] = size  # i.e. not enough liquidity at the top of the book for the full order
+                # therefore walk through the book until all the quantities are matched
                 order_quantity -= size
                 continue
         log_print("{} placing market order as multiple limit orders", order.symbol, order.quantity)
@@ -442,7 +440,8 @@ class OrderBook:
         if unrolled_history_df.empty:
             return pd.DataFrame(columns=['execution_time', 'quantity'])
 
-        executed_transactions = unrolled_history_df[unrolled_history_df['transactions'].map(lambda d: len(d)) > 0]  # remove cells that are an empty list
+        executed_transactions = unrolled_history_df[
+            unrolled_history_df['transactions'].map(lambda d: len(d)) > 0]  # remove cells that are an empty list
 
         #  Reshape into DataFrame with columns ['execution_time', 'quantity']
         transaction_list = [element for list_ in executed_transactions['transactions'].values for element in list_]
@@ -513,7 +512,6 @@ class OrderBook:
         quote_idx_dict = {quote: idx for idx, quote in enumerate(quotes)}
         quotes_times = []
 
-
         # Construct sparse matrix, where rows are timesteps, columns are quotes and elements are volume.
         S = dok_matrix((log_len, len(quotes)), dtype=int)  # Dictionary Of Keys based sparse matrix.
 
@@ -556,4 +554,3 @@ class OrderBook:
         if silent: return book
 
         log_print(book)
-

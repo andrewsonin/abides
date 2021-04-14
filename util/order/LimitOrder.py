@@ -2,7 +2,7 @@
 # Orders that typically go in an Exchange's OrderBook.
 
 from util.order.Order import Order
-from Kernel import Kernel
+from kernel import Kernel
 from agent.FinancialAgent import dollarize
 from copy import deepcopy
 

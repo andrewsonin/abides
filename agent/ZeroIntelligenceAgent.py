@@ -1,9 +1,10 @@
-from agent.TradingAgent import TradingAgent
-from util.util import log_print
-
 from math import sqrt
+
 import numpy as np
 import pandas as pd
+
+from agent.TradingAgent import TradingAgent
+from util.util import log_print
 
 
 class ZeroIntelligenceAgent(TradingAgent):
@@ -173,7 +174,7 @@ class ZeroIntelligenceAgent(TradingAgent):
         log_print("{} observed {} at {}", self.name, obs_t, self.currentTime)
 
         # Flip a coin to decide if we will buy or sell a unit at this time.
-        q = int(self.getHoldings(self.symbol) / 100) # q now represents an index to how many 100 lots are held
+        q = int(self.getHoldings(self.symbol) / 100)  # q now represents an index to how many 100 lots are held
 
         if q >= self.q_max:
             buy = False

@@ -1,15 +1,14 @@
-from agent.TradingAgent import TradingAgent
-from util.util import log_print
-
-from math import sqrt
 import numpy as np
 import pandas as pd
+
+from agent.TradingAgent import TradingAgent
+from util.util import log_print
 
 
 class NoiseAgent(TradingAgent):
 
     def __init__(self, id, name, type, symbol='IBM', starting_cash=100000,
-                 log_orders=False, log_to_file=True, random_state=None, wakeup_time = None ):
+                 log_orders=False, log_to_file=True, random_state=None, wakeup_time=None):
 
         # Base class init.
         super().__init__(id, name, type, starting_cash=starting_cash, log_orders=log_orders,
@@ -48,13 +47,13 @@ class NoiseAgent(TradingAgent):
         # Print end of day valuation.
         H = int(round(self.getHoldings(self.symbol), -2) / 100)
 
-        #noise trader surplus is marked to EOD
+        # noise trader surplus is marked to EOD
         bid, bid_vol, ask, ask_vol = self.getKnownBidAsk(self.symbol)
 
         if bid and ask:
-            rT = int(bid + ask)/2
+            rT = int(bid + ask) / 2
         else:
-            rT = self.last_trade[ self.symbol ]
+            rT = self.last_trade[self.symbol]
 
         # final (real) fundamental value times shares held.
         surplus = rT * H
@@ -97,7 +96,7 @@ class NoiseAgent(TradingAgent):
             # Market is closed and we already got the daily close price.
             return
 
-        if self.wakeup_time[0] >currentTime:
+        if self.wakeup_time[0] > currentTime:
             self.setWakeup(self.wakeup_time[0])
 
         if self.mkt_closed and (not self.symbol in self.daily_close_price):
@@ -112,7 +111,7 @@ class NoiseAgent(TradingAgent):
             self.state = 'ACTIVE'
 
     def placeOrder(self):
-        #place order in random direction at a mid
+        # place order in random direction at a mid
         buy_indicator = np.random.randint(0, 1 + 1)
 
         bid, bid_vol, ask, ask_vol = self.getKnownBidAsk(self.symbol)

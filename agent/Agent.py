@@ -6,7 +6,6 @@ from util.util import log_print
 
 
 class Agent:
-
     def __init__(self, id, name, type, random_state, log_to_file=True):
 
         # ID must be a unique number (usually autoincremented).
@@ -148,13 +147,13 @@ class Agent:
         self.kernel.setWakeup(self.id, requestedTime)
 
     def getComputationDelay(self):
-        return self.kernel.getAgentComputeDelay(sender=self.id)
+        return self.kernel.getAgentComputeDelay(sender_id=self.id)
 
     def setComputationDelay(self, requestedDelay):
-        self.kernel.setAgentComputeDelay(sender=self.id, requested_delay=requestedDelay)
+        self.kernel.setAgentComputeDelay(sender_id=self.id, requested_delay=requestedDelay)
 
     def delay(self, additionalDelay):
-        self.kernel.delayAgent(sender=self.id, additional_delay=additionalDelay)
+        self.kernel.delayAgent(sender_id=self.id, additional_delay=additionalDelay)
 
     def writeLog(self, dfLog, filename=None):
         self.kernel.writeLog(self.id, dfLog, filename)

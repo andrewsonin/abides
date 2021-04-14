@@ -14,7 +14,7 @@ import sys
 import datetime as dt
 import importlib
 
-from Kernel import Kernel
+from kernel import Kernel
 from util import util
 from util.order import LimitOrder
 from util.oracle.SparseMeanRevertingOracle import SparseMeanRevertingOracle

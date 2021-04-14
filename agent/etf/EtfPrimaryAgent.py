@@ -6,7 +6,7 @@
 # for stochasticity.
 from agent.FinancialAgent import FinancialAgent
 from agent.ExchangeAgent import ExchangeAgent
-from message.Message import Message
+from message.__init__ import Message
 from util.util import log_print
 
 import pandas as pd

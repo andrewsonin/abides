@@ -4,7 +4,7 @@
 # A sell order translates to a redemption order for shares of the underlying.
 
 from util.order.Order import Order
-from Kernel import Kernel
+from kernel import Kernel
 from agent.FinancialAgent import dollarize
 
 import sys

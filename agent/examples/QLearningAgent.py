@@ -1,5 +1,5 @@
 from agent.TradingAgent import TradingAgent
-from message.Message import Message
+from message.__init__ import Message
 from util.util import log_print
 
 import numpy as np

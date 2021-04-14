@@ -1,6 +1,6 @@
 from agent.etf.EtfArbAgent import EtfArbAgent
 from agent.etf.EtfPrimaryAgent import EtfPrimaryAgent
-from message.Message import Message
+from message.__init__ import Message
 from util.order.etf.BasketOrder import BasketOrder
 from util.order.BasketOrder import BasketOrder
 from util.util import log_print

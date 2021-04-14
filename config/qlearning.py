@@ -1,4 +1,4 @@
-from Kernel import Kernel
+from kernel import Kernel
 from agent.ExchangeAgent import ExchangeAgent
 from agent.examples.QLearningAgent import QLearningAgent
 from agent.ZeroIntelligenceAgent import ZeroIntelligenceAgent
