@@ -1,5 +1,5 @@
 from agent.Agent import Agent
-from message.__init__ import Message
+from message.__init__ import MessageAbstractBase
 from util.util import log_print
 
 
@@ -71,7 +71,7 @@ class SumServiceAgent(Agent):
     log_print("Agent {} computed sum: {}", self.id, current_sum)
 
     for sender in self.numbers.keys():
-      self.sendMessage(sender, Message({ "msg" : "SUM_QUERY_RESPONSE", "sender": self.id,
-                                         "sum" : current_sum }))
+      self.sendMessage(sender, MessageAbstractBase({"msg" : "SUM_QUERY_RESPONSE", "sender": self.id,
+                                         "sum" : current_sum}))
 
 

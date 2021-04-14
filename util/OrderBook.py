@@ -8,7 +8,7 @@ import pandas as pd
 from scipy.sparse import dok_matrix
 from tqdm import tqdm
 
-from message import Message
+from message import MessageAbstractBase
 from util.order.LimitOrder import LimitOrder
 from util.util import log_print, be_silent
 
@@ -82,9 +82,9 @@ class OrderBook:
                 log_print("SENT: notifications of order execution to agents {} and {} for orders {} and {}",
                           filled_order.agent_id, matched_order.agent_id, filled_order.order_id, matched_order.order_id)
 
-                self.owner.sendMessage(order.agent_id, Message({"msg": "ORDER_EXECUTED", "order": filled_order}))
+                self.owner.sendMessage(order.agent_id, MessageAbstractBase({"msg": "ORDER_EXECUTED", "order": filled_order}))
                 self.owner.sendMessage(matched_order.agent_id,
-                                       Message({"msg": "ORDER_EXECUTED", "order": matched_order}))
+                                       MessageAbstractBase({"msg": "ORDER_EXECUTED", "order": matched_order}))
 
                 # Accumulate the volume and average share price of the currently executing inbound trade.
                 executed.append((filled_order.quantity, filled_order.fill_price))
@@ -100,7 +100,7 @@ class OrderBook:
                 log_print("SENT: notifications of order acceptance to agent {} for order {}",
                           order.agent_id, order.order_id)
 
-                self.owner.sendMessage(order.agent_id, Message({"msg": "ORDER_ACCEPTED", "order": order}))
+                self.owner.sendMessage(order.agent_id, MessageAbstractBase({"msg": "ORDER_ACCEPTED", "order": order}))
 
                 matching = False
 
@@ -148,7 +148,9 @@ class OrderBook:
                     if quote in row:
                         if row[quote] is not None:
                             print(
-                                "WARNING: THIS IS A REAL PROBLEM: an order book contains bids and asks at the same quote price!")
+                                "WARNING: THIS IS A REAL PROBLEM: "
+                                "an order book contains bids and asks at the same quote price!"
+                            )
                     row[quote] = volume
                     self.quotes_seen.add(quote)
                 self.book_log.append(row)
@@ -340,7 +342,7 @@ class OrderBook:
                                   cancelled_order.agent_id, cancelled_order.order_id)
 
                         self.owner.sendMessage(order.agent_id,
-                                               Message({"msg": "ORDER_CANCELLED", "order": cancelled_order}))
+                                               MessageAbstractBase({"msg": "ORDER_CANCELLED", "order": cancelled_order}))
                         # We found the order and cancelled it, so stop looking.
                         self.last_update_ts = self.owner.current_time
                         return
@@ -363,7 +365,7 @@ class OrderBook:
                             log_print("SENT: notifications of order modification to agent {} for order {}",
                                       new_order.agent_id, new_order.order_id)
                             self.owner.sendMessage(order.agent_id,
-                                                   Message({"msg": "ORDER_MODIFIED", "new_order": new_order}))
+                                                   MessageAbstractBase({"msg": "ORDER_MODIFIED", "new_order": new_order}))
         if order.is_buy_order:
             self.bids = book
         else:
@@ -415,8 +417,6 @@ class OrderBook:
 
     def _update_unrolled_transactions(self, recent_history):
         """ Updates self._transacted_volume["unrolled_transactions"] with data from recent_history
-
-        :return:
         """
         new_unrolled_txn = self._unrolled_transactions_from_order_history(recent_history)
         old_unrolled_txn = self._transacted_volume["unrolled_transactions"]

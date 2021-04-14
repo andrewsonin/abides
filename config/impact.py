@@ -1,4 +1,4 @@
-from kernel import Kernel
+from core import Kernel
 from agent.ExchangeAgent import ExchangeAgent
 from agent.HeuristicBeliefLearningAgent import HeuristicBeliefLearningAgent
 from agent.examples.ImpactAgent import ImpactAgent

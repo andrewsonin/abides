@@ -1,6 +1,6 @@
 from agent.Agent import Agent
 from agent.examples.crypto.PPFL_ServiceAgent import PPFL_ServiceAgent
-from message.__init__ import Message
+from message.__init__ import MessageAbstractBase
 from util.util import log_print
 
 from util.crypto.logReg import getWeights, reportStats
@@ -195,8 +195,8 @@ class PPFL_ClientAgent(Agent):
         for idx, peer in enumerate(self.peer_list):
           # We assume a star network configuration where all messages between peers must be forwarded
           # through the server.
-          self.sendMessage(self.serviceAgentID, Message({ "msg" : "FWD_MSG", "msgToForward" : "PEER_EXCHANGE",
-                          "sender": self.id, "recipient": peer, "pubkey" : self.pubkeys[peer] }))
+          self.sendMessage(self.serviceAgentID, MessageAbstractBase({"msg" : "FWD_MSG", "msgToForward" : "PEER_EXCHANGE",
+                          "sender": self.id, "recipient": peer, "pubkey" : self.pubkeys[peer]}))
 
       if self.clear_learning:
         self.peer_exchange_complete = True
@@ -299,8 +299,8 @@ class PPFL_ClientAgent(Agent):
       self.setComputationDelay(int((dt_encryption_complete - dt_wake_start).to_timedelta64()))
 
       # Send the message to the server.
-      self.sendMessage(self.serviceAgentID, Message({ "msg" : "CLIENT_WEIGHTS", "sender": self.id,
-                                                      "weights" : weights_to_send }))
+      self.sendMessage(self.serviceAgentID, MessageAbstractBase({"msg" : "CLIENT_WEIGHTS", "sender": self.id,
+                                                      "weights" : weights_to_send}))
     
       self.current_iteration += 1
 

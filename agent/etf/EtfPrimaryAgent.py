@@ -6,7 +6,7 @@
 # for stochasticity.
 from agent.FinancialAgent import FinancialAgent
 from agent.ExchangeAgent import ExchangeAgent
-from message.__init__ import Message
+from message.__init__ import MessageAbstractBase
 from util.util import log_print
 
 import pandas as pd
@@ -70,7 +70,7 @@ class EtfPrimaryAgent(FinancialAgent):
 
     if self.mkt_close is None:
       # Ask our exchange when it opens and closes.
-      self.sendMessage(self.exchangeID, Message({ "msg" : "WHEN_MKT_CLOSE", "sender": self.id }))
+      self.sendMessage(self.exchangeID, MessageAbstractBase({"msg" : "WHEN_MKT_CLOSE", "sender": self.id}))
         
     else:
       # Get close price of ETF/nav
@@ -92,7 +92,7 @@ class EtfPrimaryAgent(FinancialAgent):
     if currentTime > self.prime_close:
       # Most messages after close will receive a 'PRIME_CLOSED' message in response.
       log_print ("{} received {}, discarded: prime is closed.", self.name, msg.body['msg'])
-      self.sendMessage(msg.body['sender'], Message({ "msg": "PRIME_CLOSED" }))
+      self.sendMessage(msg.body['sender'], MessageAbstractBase({"msg": "PRIME_CLOSED"}))
       # Don't do any further processing on these messages!
       return
 
@@ -119,7 +119,7 @@ class EtfPrimaryAgent(FinancialAgent):
       # quotes or trades.
       self.setComputationDelay(0)
 
-      self.sendMessage(msg.body['sender'], Message({ "msg": "WHEN_PRIME_OPEN", "data": self.prime_open }))
+      self.sendMessage(msg.body['sender'], MessageAbstractBase({"msg": "WHEN_PRIME_OPEN", "data": self.prime_open}))
         
     elif msg.body['msg'] == "WHEN_PRIME_CLOSE":
       log_print ("{} received WHEN_PRIME_CLOSE request from agent {}", self.name, msg.body['sender'])
@@ -129,14 +129,14 @@ class EtfPrimaryAgent(FinancialAgent):
       # quotes or trades.
       self.setComputationDelay(0)
 
-      self.sendMessage(msg.body['sender'], Message({ "msg": "WHEN_PRIME_CLOSE", "data": self.prime_close }))
+      self.sendMessage(msg.body['sender'], MessageAbstractBase({"msg": "WHEN_PRIME_CLOSE", "data": self.prime_close}))
         
     elif msg.body['msg'] == "QUERY_NAV":
       log_print ("{} received QUERY_NAV ({}) request from agent {}", self.name, msg.body['sender'])
 
       # Return the NAV for the requested symbol.
-      self.sendMessage(msg.body['sender'], Message({ "msg": "QUERY_NAV",
-           "nav": self.nav, "prime_closed": True if currentTime > self.prime_close else False }))
+      self.sendMessage(msg.body['sender'], MessageAbstractBase({"msg": "QUERY_NAV",
+           "nav": self.nav, "prime_closed": True if currentTime > self.prime_close else False}))
         
     elif msg.body['msg'] == "BASKET_ORDER":
       order = msg.body['order']
@@ -144,7 +144,7 @@ class EtfPrimaryAgent(FinancialAgent):
       if order.is_buy_order: self.create += 1
       else: self.redeem += 1
       order.fill_price = self.nav
-      self.sendMessage(msg.body['sender'], Message({ "msg": "BASKET_EXECUTED", "order": order}))
+      self.sendMessage(msg.body['sender'], MessageAbstractBase({"msg": "BASKET_EXECUTED", "order": order}))
   
 
   # Handles QUERY_LAST_TRADE messages from an exchange agent.
@@ -155,8 +155,8 @@ class EtfPrimaryAgent(FinancialAgent):
   # Used by any Trading Agent subclass to query the last trade price for a symbol.
   # This activity is not logged.
   def getLastTrade (self, symbol):
-    self.sendMessage(self.exchangeID, Message({ "msg" : "QUERY_LAST_TRADE", "sender": self.id,
-                                                "symbol" : symbol })) 
+    self.sendMessage(self.exchangeID, MessageAbstractBase({"msg" : "QUERY_LAST_TRADE", "sender": self.id,
+                                                "symbol" : symbol}))
 
   # Simple accessor methods for the market open and close times.
   def getPrimeOpen(self):

@@ -11,7 +11,7 @@ from copy import deepcopy
 import pandas as pd
 
 from agent.FinancialAgent import FinancialAgent
-from message import Message
+from message import MessageAbstractBase
 from util.OrderBook import OrderBook
 from util.util import log_print
 
@@ -128,7 +128,7 @@ class ExchangeAgent(FinancialAgent):
             # might still be processed, like requests for final trade prices or such.
             if msg.body['msg'] in ['LIMIT_ORDER', 'MARKET_ORDER', 'CANCEL_ORDER', 'MODIFY_ORDER']:
                 log_print("{} received {}: {}", self.name, msg.body['msg'], msg.body['order'])
-                self.sendMessage(msg.body['sender'], Message({"msg": "MKT_CLOSED"}))
+                self.sendMessage(msg.body['sender'], MessageAbstractBase({"msg": "MKT_CLOSED"}))
 
                 # Don't do any further processing on these messages!
                 return
@@ -138,7 +138,7 @@ class ExchangeAgent(FinancialAgent):
                 pass
             else:
                 log_print("{} received {}, discarded: market is closed.", self.name, msg.body['msg'])
-                self.sendMessage(msg.body['sender'], Message({"msg": "MKT_CLOSED"}))
+                self.sendMessage(msg.body['sender'], MessageAbstractBase({"msg": "MKT_CLOSED"}))
 
                 # Don't do any further processing on these messages!
                 return
@@ -163,7 +163,7 @@ class ExchangeAgent(FinancialAgent):
             # quotes or trades.
             self.setComputationDelay(0)
 
-            self.sendMessage(msg.body['sender'], Message({"msg": "WHEN_MKT_OPEN", "data": self.mkt_open}))
+            self.sendMessage(msg.body['sender'], MessageAbstractBase({"msg": "WHEN_MKT_OPEN", "data": self.mkt_open}))
         elif msg.body['msg'] == "WHEN_MKT_CLOSE":
             log_print("{} received WHEN_MKT_CLOSE request from agent {}", self.name, msg.body['sender'])
 
@@ -172,7 +172,7 @@ class ExchangeAgent(FinancialAgent):
             # quotes or trades.
             self.setComputationDelay(0)
 
-            self.sendMessage(msg.body['sender'], Message({"msg": "WHEN_MKT_CLOSE", "data": self.mkt_close}))
+            self.sendMessage(msg.body['sender'], MessageAbstractBase({"msg": "WHEN_MKT_CLOSE", "data": self.mkt_close}))
         elif msg.body['msg'] == "QUERY_LAST_TRADE":
             symbol = msg.body['symbol']
             if symbol not in self.order_books:
@@ -183,7 +183,7 @@ class ExchangeAgent(FinancialAgent):
 
                 # Return the single last executed trade price (currently not volume) for the requested symbol.
                 # This will return the average share price if multiple executions resulted from a single order.
-                self.sendMessage(msg.body['sender'], Message({"msg": "QUERY_LAST_TRADE", "symbol": symbol,
+                self.sendMessage(msg.body['sender'], MessageAbstractBase({"msg": "QUERY_LAST_TRADE", "symbol": symbol,
                                                               "data": self.order_books[symbol].last_trade,
                                                               "mkt_closed": True if currentTime > self.mkt_close else False}))
         elif msg.body['msg'] == "QUERY_SPREAD":
@@ -197,7 +197,7 @@ class ExchangeAgent(FinancialAgent):
 
                 # Return the requested depth on both sides of the order book for the requested symbol.
                 # Returns price levels and aggregated volume at each level (not individual orders).
-                self.sendMessage(msg.body['sender'], Message({"msg": "QUERY_SPREAD", "symbol": symbol, "depth": depth,
+                self.sendMessage(msg.body['sender'], MessageAbstractBase({"msg": "QUERY_SPREAD", "symbol": symbol, "depth": depth,
                                                               "bids": self.order_books[symbol].getInsideBids(depth),
                                                               "asks": self.order_books[symbol].getInsideAsks(depth),
                                                               "data": self.order_books[symbol].last_trade,
@@ -221,10 +221,10 @@ class ExchangeAgent(FinancialAgent):
             # We return indices [1:length] inclusive because the agent will want "orders leading up to the last
             # L trades", and the items under index 0 are more recent than the last trade.
             self.sendMessage(msg.body['sender'],
-                             Message({"msg": "QUERY_ORDER_STREAM", "symbol": symbol, "length": length,
+                             MessageAbstractBase({"msg": "QUERY_ORDER_STREAM", "symbol": symbol, "length": length,
                                       "mkt_closed": True if currentTime > self.mkt_close else False,
                                       "orders": self.order_books[symbol].history[1:length + 1]
-                                      }))
+                                                  }))
         elif msg.body['msg'] == 'QUERY_TRANSACTED_VOLUME':
             symbol = msg.body['symbol']
             lookback_period = msg.body['lookback_period']
@@ -234,11 +234,11 @@ class ExchangeAgent(FinancialAgent):
                 log_print("{} received QUERY_TRANSACTED_VOLUME ({}:{}) request from agent {}", self.name, symbol,
                           lookback_period,
                           msg.body['sender'])
-            self.sendMessage(msg.body['sender'], Message({"msg": "QUERY_TRANSACTED_VOLUME", "symbol": symbol,
+            self.sendMessage(msg.body['sender'], MessageAbstractBase({"msg": "QUERY_TRANSACTED_VOLUME", "symbol": symbol,
                                                           "transacted_volume": self.order_books[
                                                               symbol].get_transacted_volume(lookback_period),
                                                           "mkt_closed": True if currentTime > self.mkt_close else False
-                                                          }))
+                                                                      }))
         elif msg.body['msg'] == "LIMIT_ORDER":
             order = msg.body['order']
             log_print("{} received LIMIT_ORDER: {}", self.name, order)
@@ -314,7 +314,7 @@ class ExchangeAgent(FinancialAgent):
                 if (freq == 0) or \
                         ((orderbook_last_update > last_agent_update) and (
                                 (orderbook_last_update - last_agent_update).delta >= freq)):
-                    self.sendMessage(agent_id, Message({"msg": "MARKET_DATA",
+                    self.sendMessage(agent_id, MessageAbstractBase({"msg": "MARKET_DATA",
                                                         "symbol": symbol,
                                                         "bids": self.order_books[symbol].getInsideBids(levels),
                                                         "asks": self.order_books[symbol].getInsideAsks(levels),

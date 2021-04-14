@@ -5,7 +5,7 @@ import sys
 import datetime as dt
 from dateutil.parser import parse
 
-from kernel import Kernel
+from core import Kernel
 from util import util
 from util.order import LimitOrder
 from util.oracle.SparseMeanRevertingOracle import SparseMeanRevertingOracle

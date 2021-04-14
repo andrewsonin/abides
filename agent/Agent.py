@@ -27,7 +27,7 @@ class Agent:
         self.log_to_file = log_to_file
         self.random_state = random_state
 
-        if not random_state:
+        if not isinstance(random_state, np.random.RandomState):
             raise ValueError(
                 "A valid, seeded np.random.RandomState object is required for every agent.Agent",
                 self.name
@@ -114,7 +114,8 @@ class Agent:
         self.log.append({'EventTime': self.currentTime, 'EventType': eventType,
                          'Event': e})
 
-        if appendSummaryLog: self.kernel.appendSummaryLog(self.id, eventType, e)
+        if appendSummaryLog:
+            self.kernel.appendSummaryLog(self.id, eventType, e)
 
     ### Methods required for communication from other agents.
     ### The kernel will _not_ call these methods on its own behalf,

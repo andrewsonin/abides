@@ -1,5 +1,5 @@
 # Our custom modules.
-from kernel import Kernel
+from core import Kernel
 from agent.examples.crypto.PPFL_TemplateClientAgent import PPFL_TemplateClientAgent as PPFL_ClientAgent
 from agent.examples.crypto.PPFL_ServiceAgent import PPFL_ServiceAgent
 from model.LatencyModel import LatencyModel

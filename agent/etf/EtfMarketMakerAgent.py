@@ -1,6 +1,6 @@
 from agent.etf.EtfArbAgent import EtfArbAgent
 from agent.etf.EtfPrimaryAgent import EtfPrimaryAgent
-from message.__init__ import Message
+from message.__init__ import MessageAbstractBase
 from util.order.etf.BasketOrder import BasketOrder
 from util.order.BasketOrder import BasketOrder
 from util.util import log_print
@@ -53,8 +53,8 @@ class EtfMarketMakerAgent(EtfArbAgent):
     
     if not self.prime_open:
       # Ask our primary when it opens and closes, exchange is handled in TradingAgent
-      self.sendMessage(self.primeID, Message({ "msg" : "WHEN_PRIME_OPEN", "sender": self.id }))
-      self.sendMessage(self.primeID, Message({ "msg" : "WHEN_PRIME_CLOSE", "sender": self.id }))
+      self.sendMessage(self.primeID, MessageAbstractBase({"msg" : "WHEN_PRIME_OPEN", "sender": self.id}))
+      self.sendMessage(self.primeID, MessageAbstractBase({"msg" : "WHEN_PRIME_CLOSE", "sender": self.id}))
 
 
     # Steady state wakeup behavior starts here.
@@ -224,15 +224,15 @@ class EtfMarketMakerAgent(EtfArbAgent):
   # Used by any ETF Arb Agent subclass to query the Net Assest Value (NAV) of the ETF.
   # This activity is not logged.
   def getEtfNav (self):
-    self.sendMessage(self.primeID, Message({ "msg" : "QUERY_NAV", "sender": self.id })) 
+    self.sendMessage(self.primeID, MessageAbstractBase({"msg" : "QUERY_NAV", "sender": self.id}))
     
   # Used by ETF Arb Agent subclass to place a basket order.
   # This activity is not logged.
   def placeBasketOrder (self, quantity, is_create_order):
     order = BasketOrder(self.id, self.currentTime, 'ETF', quantity, is_create_order)
     print('BASKET ORDER PLACED: ' + str(order))
-    self.sendMessage(self.primeID, Message({ "msg" : "BASKET_ORDER", "sender": self.id,
-                                                  "order" : order })) 
+    self.sendMessage(self.primeID, MessageAbstractBase({"msg" : "BASKET_ORDER", "sender": self.id,
+                                                  "order" : order}))
     self.state = 'AWAITING_BASKET'
   
   # Handles QUERY NAV messages from primary

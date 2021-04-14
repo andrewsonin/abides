@@ -5,7 +5,7 @@ from copy import deepcopy
 
 from agent.ExchangeAgent import ExchangeAgent
 from agent.FinancialAgent import FinancialAgent
-from message import Message
+from message import MessageAbstractBase
 from util.order.LimitOrder import LimitOrder
 from util.order.MarketOrder import MarketOrder
 from util.util import log_print
@@ -159,8 +159,8 @@ class TradingAgent(FinancialAgent):
 
         if self.mkt_open is None:
             # Ask our exchange when it opens and closes.
-            self.sendMessage(self.exchangeID, Message({"msg": "WHEN_MKT_OPEN", "sender": self.id}))
-            self.sendMessage(self.exchangeID, Message({"msg": "WHEN_MKT_CLOSE", "sender": self.id}))
+            self.sendMessage(self.exchangeID, MessageAbstractBase({"msg": "WHEN_MKT_OPEN", "sender": self.id}))
+            self.sendMessage(self.exchangeID, MessageAbstractBase({"msg": "WHEN_MKT_CLOSE", "sender": self.id}))
 
         # For the sake of subclasses, TradingAgent now returns a boolean
         # indicating whether the agent is "ready to trade" -- has it received
@@ -169,13 +169,13 @@ class TradingAgent(FinancialAgent):
 
     def requestDataSubscription(self, symbol, levels, freq):
         self.sendMessage(recipientID=self.exchangeID,
-                         msg=Message({"msg": "MARKET_DATA_SUBSCRIPTION_REQUEST",
+                         msg=MessageAbstractBase({"msg": "MARKET_DATA_SUBSCRIPTION_REQUEST",
                                       "sender": self.id, "symbol": symbol, "levels": levels, "freq": freq}))
 
     # Used by any Trading Agent subclass to cancel subscription to market data from the Exchange Agent
     def cancelDataSubscription(self, symbol):
         self.sendMessage(recipientID=self.exchangeID,
-                         msg=Message({"msg": "MARKET_DATA_SUBSCRIPTION_CANCELLATION",
+                         msg=MessageAbstractBase({"msg": "MARKET_DATA_SUBSCRIPTION_CANCELLATION",
                                       "sender": self.id, "symbol": symbol}))
 
     def receiveMessage(self, currentTime, msg):
@@ -265,24 +265,24 @@ class TradingAgent(FinancialAgent):
     # Used by any Trading Agent subclass to query the last trade price for a symbol.
     # This activity is not logged.
     def getLastTrade(self, symbol):
-        self.sendMessage(self.exchangeID, Message({"msg": "QUERY_LAST_TRADE", "sender": self.id,
+        self.sendMessage(self.exchangeID, MessageAbstractBase({"msg": "QUERY_LAST_TRADE", "sender": self.id,
                                                    "symbol": symbol}))
 
         # Used by any Trading Agent subclass to query the current spread for a symbol.
 
     # This activity is not logged.
     def getCurrentSpread(self, symbol, depth=1):
-        self.sendMessage(self.exchangeID, Message({"msg": "QUERY_SPREAD", "sender": self.id,
+        self.sendMessage(self.exchangeID, MessageAbstractBase({"msg": "QUERY_SPREAD", "sender": self.id,
                                                    "symbol": symbol, "depth": depth}))
 
     # Used by any Trading Agent subclass to query the recent order stream for a symbol.
     def getOrderStream(self, symbol, length=1):
-        self.sendMessage(self.exchangeID, Message({"msg": "QUERY_ORDER_STREAM", "sender": self.id,
+        self.sendMessage(self.exchangeID, MessageAbstractBase({"msg": "QUERY_ORDER_STREAM", "sender": self.id,
                                                    "symbol": symbol, "length": length}))
 
     def get_transacted_volume(self, symbol, lookback_period='10min'):
         """ Used by any trading agent subclass to query the total transacted volume in a given lookback period """
-        self.sendMessage(self.exchangeID, Message({"msg": "QUERY_TRANSACTED_VOLUME", "sender": self.id,
+        self.sendMessage(self.exchangeID, MessageAbstractBase({"msg": "QUERY_TRANSACTED_VOLUME", "sender": self.id,
                                                    "symbol": symbol, "lookback_period": lookback_period}))
 
     # Used by any Trading Agent subclass to place a limit order.  Parameters expect:
@@ -325,7 +325,7 @@ class TradingAgent(FinancialAgent):
             # objects inside the order (we're halfway there) so there CAN be just a single
             # object per order, that never alters its original state, and eliminate all these copies.
             self.orders[order.order_id] = deepcopy(order)
-            self.sendMessage(self.exchangeID, Message({"msg": "LIMIT_ORDER", "sender": self.id,
+            self.sendMessage(self.exchangeID, MessageAbstractBase({"msg": "LIMIT_ORDER", "sender": self.id,
                                                        "order": order}))
 
             # Log this activity.
@@ -365,7 +365,7 @@ class TradingAgent(FinancialAgent):
                               order, self.fmtHoldings(self.holdings))
                     return
             self.orders[order.order_id] = deepcopy(order)
-            self.sendMessage(self.exchangeID, Message({"msg": "MARKET_ORDER", "sender": self.id, "order": order}))
+            self.sendMessage(self.exchangeID, MessageAbstractBase({"msg": "MARKET_ORDER", "sender": self.id, "order": order}))
             if self.log_orders: self.logEvent('ORDER_SUBMITTED', order.to_dict())
         else:
             log_print("TradingAgent ignored market order of quantity zero: {}", order)
@@ -374,7 +374,7 @@ class TradingAgent(FinancialAgent):
         """Used by any Trading Agent subclass to cancel any order.  The order must currently
         appear in the agent's open orders list."""
         if isinstance(order, LimitOrder):
-            self.sendMessage(self.exchangeID, Message({"msg": "CANCEL_ORDER", "sender": self.id,
+            self.sendMessage(self.exchangeID, MessageAbstractBase({"msg": "CANCEL_ORDER", "sender": self.id,
                                                        "order": order}))
             # Log this activity.
             if self.log_orders: self.logEvent('CANCEL_SUBMITTED', order.to_dict())
@@ -385,7 +385,7 @@ class TradingAgent(FinancialAgent):
         """ Used by any Trading Agent subclass to modify any existing limit order.  The order must currently
             appear in the agent's open orders list.  Some additional tests might be useful here
             to ensure the old and new orders are the same in some way."""
-        self.sendMessage(self.exchangeID, Message({"msg": "MODIFY_ORDER", "sender": self.id,
+        self.sendMessage(self.exchangeID, MessageAbstractBase({"msg": "MODIFY_ORDER", "sender": self.id,
                                                    "order": order, "new_order": newOrder}))
 
         # Log this activity.

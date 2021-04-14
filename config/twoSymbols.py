@@ -1,4 +1,4 @@
-from kernel import Kernel
+from core import Kernel
 from agent.ExchangeAgent import ExchangeAgent
 from agent.etf.EtfPrimaryAgent import EtfPrimaryAgent
 from agent.HeuristicBeliefLearningAgent import HeuristicBeliefLearningAgent

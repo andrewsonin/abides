@@ -1,5 +1,5 @@
 from agent.Agent import Agent
-from message.__init__ import Message
+from message.__init__ import MessageAbstractBase
 from util.util import log_print
 from util.crypto.logReg import getWeights
 
@@ -148,7 +148,7 @@ class PPFL_ServiceAgent(Agent):
       # Send the combined weights back to each client who participated.
       for sender in self.received.keys():
         log_print ("Sending {} to {}", totals, sender)
-        self.sendMessage(sender, Message({ "msg" : "SHARED_WEIGHTS", "sender": self.id, "weights" : deepcopy(totals) }))
+        self.sendMessage(sender, MessageAbstractBase({"msg" : "SHARED_WEIGHTS", "sender": self.id, "weights" : deepcopy(totals)}))
 
       # This is the end of one round of the protocol.
       self.current_iteration += 1

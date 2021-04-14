@@ -4,7 +4,7 @@ import pandas as pd
 import sys
 import datetime as dt
 
-from kernel import Kernel
+from core import Kernel
 from util import util
 from util.order import LimitOrder
 from agent.ExchangeAgent import ExchangeAgent

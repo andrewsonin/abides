@@ -1,6 +1,6 @@
 from agent.Agent import Agent
 from agent.examples.SumServiceAgent import SumServiceAgent
-from message.__init__ import Message
+from message.__init__ import MessageAbstractBase
 from util.util import log_print
 
 import pandas as pd
@@ -62,7 +62,7 @@ class SumClientAgent(Agent):
       log_print ("agent {} numbers to exchange: {}", self.id, n)
 
       for idx, peer in enumerate(self.peer_list):
-        self.sendMessage(peer, Message({ "msg" : "PEER_EXCHANGE", "sender": self.id, "n" : n[idx] }))
+        self.sendMessage(peer, MessageAbstractBase({"msg" : "PEER_EXCHANGE", "sender": self.id, "n" : n[idx]}))
 
     else:
       # For subsequent (self-induced) wakeups, place a sum query.
@@ -74,8 +74,8 @@ class SumClientAgent(Agent):
       n1 += self.peer_sum
       n2 += self.peer_sum
 
-      self.sendMessage(self.serviceAgentID, Message({ "msg" : "SUM_QUERY", "sender": self.id,
-                                                      "n1" : n1, "n2" : n2 })) 
+      self.sendMessage(self.serviceAgentID, MessageAbstractBase({"msg" : "SUM_QUERY", "sender": self.id,
+                                                      "n1" : n1, "n2" : n2}))
 
     return
 
