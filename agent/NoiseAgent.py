@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 from agent.TradingAgent import TradingAgent
-from util.util import log_print
+from util import log_print
 
 
 class NoiseAgent(TradingAgent):

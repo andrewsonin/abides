@@ -1,12 +1,14 @@
-import pickle
 import os.path
-from datetime import datetime
+import pickle
+
 import pandas as pd
-#from joblib import Memory
 
 from agent.TradingAgent import TradingAgent
-from util.order.LimitOrder import LimitOrder
-from util.util import log_print
+from order.LimitOrder import LimitOrder
+from util import log_print
+
+
+# from joblib import Memory
 
 
 class MarketReplayAgentUSD(TradingAgent):
@@ -58,11 +60,11 @@ class MarketReplayAgentUSD(TradingAgent):
                 # self.modifyOrder(existing_order, LimitOrder(self.id, currentTime, self.symbol, order['SIZE'],
                 #                                             order['BUY_SELL_FLAG'] == 'BUY', order['PRICE'],
                 #                                             order_id=order_id))
-                self.modifyOrder(existing_order, LimitOrder(self.id, currentTime, self.symbol, order['Size'], 
+                self.modifyOrder(existing_order, LimitOrder(self.id, currentTime, self.symbol, order['Size'],
                                                             order['Direction'] == 'BUY', order['Price'],
                                                             order_id=order_id))
             else:
-                None # TODO: check if something is comming here. We should process A and Z types as well
+                None  # TODO: check if something is comming here. We should process A and Z types as well
         else:
             for ind_order in order:
                 self.placeOrder(currentTime, order=[ind_order])
@@ -72,14 +74,15 @@ class MarketReplayAgentUSD(TradingAgent):
         return self.historical_orders.first_wakeup - self.mkt_open
 
 
-#mem = Memory(cachedir='./cache', verbose=0)
+# mem = Memory(cachedir='./cache', verbose=0)
 
 
 class L3OrdersProcessor:
-    #COLUMNS = ['TIMESTAMP', 'ORDER_ID', 'PRICE', 'SIZE', 'BUY_SELL_FLAG']
-    DIRECTION = {0: 'BUY', 1: 'SELL'} # 0 - bid, 1-ask
-    #COLUMNS = ['Time', 'Type', 'Order_ID', 'Size', 'Price', 'Direction']
-    #DIRECTION = {1: 'BUY', -1: 'SELL'}
+    # COLUMNS = ['TIMESTAMP', 'ORDER_ID', 'PRICE', 'SIZE', 'BUY_SELL_FLAG']
+    DIRECTION = {0: 'BUY', 1: 'SELL'}  # 0 - bid, 1-ask
+
+    # COLUMNS = ['Time', 'Type', 'Order_ID', 'Size', 'Price', 'Direction']
+    # DIRECTION = {1: 'BUY', -1: 'SELL'}
 
     # Class for reading historical exchange orders stream
     def __init__(self, symbol, date, start_time, end_time, orders_file_path, processed_orders_folder_path):
@@ -97,14 +100,14 @@ class L3OrdersProcessor:
     def processOrders(self):
         def convertDate(date_str):
             try:
-                #return datetime.strptime(date_str, '%Y%m%d%H%M%S.%f')
-                
-                return pd.to_datetime("2012-06-21 00:00:00") + pd.Timedelta(seconds=float(date_str))
-                #return pd.Timestamp("2012-06-21 00:00:00") + float(date_str) * pd.offsets.Second()
-            except ValueError:
-                return None #convertDate(date_str[:-1])
+                # return datetime.strptime(date_str, '%Y%m%d%H%M%S.%f')
 
-        #@mem.cache
+                return pd.to_datetime("2012-06-21 00:00:00") + pd.Timedelta(seconds=float(date_str))
+                # return pd.Timestamp("2012-06-21 00:00:00") + float(date_str) * pd.offsets.Second()
+            except ValueError:
+                return None  # convertDate(date_str[:-1])
+
+        # @mem.cache
         def read_processed_orders_file(processed_orders_file):
             with open(processed_orders_file, 'rb') as handle:
                 return pickle.load(handle)
@@ -116,25 +119,27 @@ class L3OrdersProcessor:
         else:
             print(f'Processed file does not exist for {self.symbol} and {self.date.date()}, processing...')
 
-            #orders_df = pd.read_csv(self.orders_file_path, header=None) #, nrows=5000
+            # orders_df = pd.read_csv(self.orders_file_path, header=None) #, nrows=5000
             orders_df = pd.read_pickle('/Users/a16643222/Documents/abides_zbg/data/marketreplay/input/LOB_df.pkl')
-            orders_df = orders_df[(orders_df.Time > '2021-03-22 10:30') & (orders_df.Time < '2021-03-22 11:00')] #DEBUG
+            orders_df = orders_df[
+                (orders_df.Time > '2021-03-22 10:30') & (orders_df.Time < '2021-03-22 11:00')]  # DEBUG
             orders_df['correction'] = orders_df.groupby('Time').cumcount()
             orders_df['Time'] = orders_df['Time'] + orders_df.correction.apply(lambda x: pd.Timedelta(x, unit='ns'))
-            #orders_df.columns = self.COLUMNS
-            orders_df['Direction'] = orders_df['BUY_SELL_FLAG'].astype(int).replace(L3OrdersProcessor.DIRECTION) #TODO:verify
-            #orders_df['Timestamp'] = orders_df['Time'].astype(str).apply(convertDate)
-            #orders_df['Size'] = orders_df['Size'].astype(int)
-            #orders_df['Price'] = orders_df['Price'].astype(int)
-            #orders_df['Type'] = orders_df['Type'].astype(int)
+            # orders_df.columns = self.COLUMNS
+            orders_df['Direction'] = orders_df['BUY_SELL_FLAG'].astype(int).replace(
+                L3OrdersProcessor.DIRECTION)  # TODO:verify
+            # orders_df['Timestamp'] = orders_df['Time'].astype(str).apply(convertDate)
+            # orders_df['Size'] = orders_df['Size'].astype(int)
+            # orders_df['Price'] = orders_df['Price'].astype(int)
+            # orders_df['Type'] = orders_df['Type'].astype(int)
             orders_df.rename(columns={
-                'Time':'Timestamp',
-                'SIZE':'Size',
-                'PRICE':'Price',
-                'RECORD_TYPE':'Type',
-                'ORDER_ID':'Order_ID'
+                'Time': 'Timestamp',
+                'SIZE': 'Size',
+                'PRICE': 'Price',
+                'RECORD_TYPE': 'Type',
+                'ORDER_ID': 'Order_ID'
             }, inplace=True)
-            orders_df = orders_df[['Timestamp',  'Order_ID', 'Price', 'Direction', 'Size','Type']]
+            orders_df = orders_df[['Timestamp', 'Order_ID', 'Price', 'Direction', 'Size', 'Type']]
             orders_df = orders_df.loc[(orders_df.Timestamp >= self.start_time) & (orders_df.Timestamp < self.end_time)]
             orders_df.set_index('Timestamp', inplace=True)
             log_print(f"Number of Orders: {len(orders_df)}")

@@ -1,8 +1,9 @@
-import pandas as pd
 import datetime
 
+import pandas as pd
+
 from agent.TradingAgent import TradingAgent
-from util.util import log_print
+from util import log_print
 
 
 class ExecutionAgent(TradingAgent):
@@ -33,7 +34,7 @@ class ExecutionAgent(TradingAgent):
         super().kernelStopping()
         if self.trade:
             slippage = self.get_average_transaction_price() - self.arrival_price if self.direction == 'BUY' else \
-                       self.arrival_price - self.get_average_transaction_price()
+                self.arrival_price - self.get_average_transaction_price()
             self.logEvent('DIRECTION', self.direction, True)
             self.logEvent('TOTAL_QTY', self.quantity, True)
             self.logEvent('REM_QTY', self.rem_quantity, True)
@@ -55,8 +56,10 @@ class ExecutionAgent(TradingAgent):
 
     def receiveMessage(self, currentTime, msg):
         super().receiveMessage(currentTime, msg)
-        if msg.body['msg'] == 'ORDER_EXECUTED': self.handleOrderExecution(currentTime, msg)
-        elif msg.body['msg'] == 'ORDER_ACCEPTED': self.handleOrderAcceptance(currentTime, msg)
+        if msg.body['msg'] == 'ORDER_EXECUTED':
+            self.handleOrderExecution(currentTime, msg)
+        elif msg.body['msg'] == 'ORDER_ACCEPTED':
+            self.handleOrderAcceptance(currentTime, msg)
         if self.rem_quantity > 0 and self.state == 'AWAITING_SPREAD' and msg.body['msg'] == 'QUERY_SPREAD':
             self.cancelOrders()
             self.placeOrders(currentTime)
@@ -72,7 +75,8 @@ class ExecutionAgent(TradingAgent):
         log_print('[---- {} - {} ----]: EXECUTED QUANTITY: {}'.format(self.name, currentTime, executed_qty))
         log_print('[---- {} - {} ----]: REMAINING QUANTITY: {}'.format(self.name, currentTime, self.rem_quantity))
         log_print('[---- {} - {} ----]: % EXECUTED: {} \n'.format(self.name, currentTime,
-                                                                   round((1 - self.rem_quantity / self.quantity) * 100, 2)))
+                                                                  round((1 - self.rem_quantity / self.quantity) * 100,
+                                                                        2)))
 
     def handleOrderAcceptance(self, currentTime, msg):
         accepted_order = msg.body['order']
@@ -89,10 +93,10 @@ class ExecutionAgent(TradingAgent):
             if currentTime.floor('1s') == self.start_time:
                 self.arrival_price = (bid + ask) / 2
                 log_print("[---- {}  - {} ----]: Arrival Mid Price {}".format(self.name, currentTime,
-                                                                               self.arrival_price))
+                                                                              self.arrival_price))
 
             qty = self.schedule[pd.Interval(currentTime.floor('1s'),
-                                            currentTime.floor('1s')+datetime.timedelta(minutes=1))]
+                                            currentTime.floor('1s') + datetime.timedelta(minutes=1))]
             price = ask if self.direction == 'BUY' else bid
             self.placeLimitOrder(symbol=self.symbol, quantity=qty,
                                  is_buy_order=self.direction == 'BUY', limit_price=price)

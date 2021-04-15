@@ -1,12 +1,14 @@
-from agent.examples.SubscriptionAgent import SubscriptionAgent
 import pandas as pd
-from copy import deepcopy
+
+from agent.examples.SubscriptionAgent import SubscriptionAgent
 
 
 class ExampleExperimentalAgentTemplate(SubscriptionAgent):
     """ Minimal working template for an experimental trading agent
     """
-    def __init__(self, id, name, type, symbol, starting_cash, levels, subscription_freq, log_orders=False, random_state=None):
+
+    def __init__(self, id, name, type, symbol, starting_cash, levels, subscription_freq, log_orders=False,
+                 random_state=None):
         """  Constructor for ExampleExperimentalAgentTemplate.
 
         :param id: Agent's ID as set in config
@@ -19,7 +21,8 @@ class ExampleExperimentalAgentTemplate(SubscriptionAgent):
         :param log_orders: bool to decide if agent's individual actions logged to file.
         :param random_state: numpy RandomState object from which agent derives randomness
         """
-        super().__init__(id, name, type, symbol, starting_cash, levels, subscription_freq, log_orders=log_orders, random_state=random_state)
+        super().__init__(id, name, type, symbol, starting_cash, levels, subscription_freq, log_orders=log_orders,
+                         random_state=random_state)
 
         self.current_bids = None  # subscription to market data populates this list
         self.current_asks = None  # subscription to market data populates this list
@@ -140,7 +143,3 @@ class ExampleExperimentalAgent(ExampleExperimentalAgentTemplate):
     def getWakeFrequency(self):
         """ Set next wakeup time for agent. """
         return pd.Timedelta(self.wake_freq)
-
-
-
-

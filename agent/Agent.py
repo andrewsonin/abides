@@ -3,10 +3,12 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 
-from util.util import log_print
+from util import log_print
 
 
 class Agent:
+    agent_type = "Agent"
+
     def __init__(self,
                  *,
                  agent_id: int,
@@ -53,7 +55,7 @@ class Agent:
         # It might, or might not, make sense to formalize these log Events
         # as a class, with enumerated EventTypes and so forth.
         self.log = []
-        self.logEvent("AGENT_TYPE", agent_type)
+        self.logEvent("AGENT_TYPE", self.__class__.__name__)
 
     ### Flow of required kernel listening methods:
     ### init -> start -> (entire simulation) -> end -> terminate

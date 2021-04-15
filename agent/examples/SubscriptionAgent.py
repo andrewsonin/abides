@@ -1,7 +1,7 @@
-from agent.TradingAgent import TradingAgent
-from util.util import log_print
-
 import pandas as pd
+
+from agent.TradingAgent import TradingAgent
+from util import log_print
 
 
 class SubscriptionAgent(TradingAgent):
@@ -17,7 +17,7 @@ class SubscriptionAgent(TradingAgent):
         self.subscribe = True  # Flag to determine whether to subscribe to data or use polling mechanism
         self.subscription_requested = False
         self.last_update_ts = None  # timestamp of the last agent update.
-                                    # This is NOT required but only used to demonstrate how subscription works
+        # This is NOT required but only used to demonstrate how subscription works
         self.state = 'AWAITING_MARKET_DATA'
         self.current_bids = None
         self.current_asks = None

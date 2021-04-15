@@ -1,12 +1,14 @@
-import pickle
 import os.path
-from datetime import datetime
+import pickle
+
 import pandas as pd
-#from joblib import Memory
 
 from agent.TradingAgent import TradingAgent
-from util.order.LimitOrder import LimitOrder
-from util.util import log_print
+from order.LimitOrder import LimitOrder
+from util import log_print
+
+
+# from joblib import Memory
 
 
 class MarketReplayAgent(TradingAgent):
@@ -49,7 +51,7 @@ class MarketReplayAgent(TradingAgent):
             order = order[0]
             order_id = order['Order_ID']
             existing_order = self.orders.get(order_id)
-            if not existing_order and order['Size'] > 0 and order['Type'] in [1,5]:
+            if not existing_order and order['Size'] > 0 and order['Type'] in [1, 5]:
                 self.placeLimitOrder(self.symbol, order['Size'], order['Direction'] == 'BUY', order['Price'],
                                      order_id=order_id)
             elif existing_order and order['Type'] == 3:
@@ -58,11 +60,13 @@ class MarketReplayAgent(TradingAgent):
                 # self.modifyOrder(existing_order, LimitOrder(self.id, currentTime, self.symbol, order['SIZE'],
                 #                                             order['BUY_SELL_FLAG'] == 'BUY', order['PRICE'],
                 #                                             order_id=order_id))
-                self.modifyOrder(existing_order, LimitOrder(self.id, currentTime, self.symbol, existing_order.quantity - order['Size'], #there was order['Size'] 
-                                                            order['Direction'] == 'BUY', order['Price'],
-                                                            order_id=order_id))
+                self.modifyOrder(existing_order,
+                                 LimitOrder(self.id, currentTime, self.symbol, existing_order.quantity - order['Size'],
+                                            # there was order['Size']
+                                            order['Direction'] == 'BUY', order['Price'],
+                                            order_id=order_id))
             else:
-                None # TODO: type 4 should be ok, but type 7 ?
+                None  # TODO: type 4 should be ok, but type 7 ?
         else:
             for ind_order in order:
                 self.placeOrder(currentTime, order=[ind_order])
@@ -72,12 +76,12 @@ class MarketReplayAgent(TradingAgent):
         return self.historical_orders.first_wakeup - self.mkt_open
 
 
-#mem = Memory(cachedir='./cache', verbose=0)
+# mem = Memory(cachedir='./cache', verbose=0)
 
 
 class L3OrdersProcessor:
-    #COLUMNS = ['TIMESTAMP', 'ORDER_ID', 'PRICE', 'SIZE', 'BUY_SELL_FLAG']
-    #DIRECTION = {0: 'BUY', 1: 'SELL'}
+    # COLUMNS = ['TIMESTAMP', 'ORDER_ID', 'PRICE', 'SIZE', 'BUY_SELL_FLAG']
+    # DIRECTION = {0: 'BUY', 1: 'SELL'}
     COLUMNS = ['Time', 'Type', 'Order_ID', 'Size', 'Price', 'Direction']
     DIRECTION = {1: 'BUY', -1: 'SELL'}
 
@@ -97,14 +101,14 @@ class L3OrdersProcessor:
     def processOrders(self):
         def convertDate(date_str):
             try:
-                #return datetime.strptime(date_str, '%Y%m%d%H%M%S.%f')
-                
-                return pd.to_datetime("2012-06-21 00:00:00") + pd.Timedelta(seconds=float(date_str))
-                #return pd.Timestamp("2012-06-21 00:00:00") + float(date_str) * pd.offsets.Second()
-            except ValueError:
-                return None #convertDate(date_str[:-1])
+                # return datetime.strptime(date_str, '%Y%m%d%H%M%S.%f')
 
-        #@mem.cache
+                return pd.to_datetime("2012-06-21 00:00:00") + pd.Timedelta(seconds=float(date_str))
+                # return pd.Timestamp("2012-06-21 00:00:00") + float(date_str) * pd.offsets.Second()
+            except ValueError:
+                return None  # convertDate(date_str[:-1])
+
+        # @mem.cache
         def read_processed_orders_file(processed_orders_file):
             with open(processed_orders_file, 'rb') as handle:
                 return pickle.load(handle)
@@ -119,13 +123,13 @@ class L3OrdersProcessor:
             # all_columns = orders_df.columns[0].split('|')
             # orders_df = orders_df[orders_df.columns[0]].str.split('|', 16, expand=True)
             # orders_df.columns = all_columns
-            orders_df = pd.read_csv(self.orders_file_path, header=None) #, nrows=5000
-            #orders_df = orders_df[L3OrdersProcessor.COLUMNS]
+            orders_df = pd.read_csv(self.orders_file_path, header=None)  # , nrows=5000
+            # orders_df = orders_df[L3OrdersProcessor.COLUMNS]
             orders_df.columns = self.COLUMNS
             orders_df['Direction'] = orders_df['Direction'].astype(int).replace(L3OrdersProcessor.DIRECTION)
             orders_df['Timestamp'] = orders_df['Time'].astype(str).apply(convertDate)
             orders_df['Size'] = orders_df['Size'].astype(int)
-            #orders_df['PRICE'] = orders_df['PRICE'].astype(float) * 100
+            # orders_df['PRICE'] = orders_df['PRICE'].astype(float) * 100
             orders_df['Price'] = orders_df['Price'].astype(int)
             orders_df['Type'] = orders_df['Type'].astype(int)
             orders_df = orders_df.loc[(orders_df.Timestamp >= self.start_time) & (orders_df.Timestamp < self.end_time)]

@@ -1,8 +1,8 @@
 from agent.TradingAgent import TradingAgent
 import pandas as pd
-from util.util import log_print
+from util.__init__ import log_print
 from collections import namedtuple, deque
-from util.util import ignored
+from util.__init__ import ignored
 
 
 ANCHOR_TOP_STR = 'top'

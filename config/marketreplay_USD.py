@@ -7,17 +7,11 @@ import datetime as dt
 from dateutil.parser import parse
 
 from core import Kernel
-from util import util
-from util.order import LimitOrder
-from util.oracle.SparseMeanRevertingOracle import SparseMeanRevertingOracle
-
+from order import LimitOrder
+from util import __init__
 from agent.ExchangeAgent import ExchangeAgent
-from agent.NoiseAgent import NoiseAgent
-from agent.ValueAgent import ValueAgent
-from agent.market_makers.AdaptiveMarketMakerAgent import AdaptiveMarketMakerAgent
 from agent.examples.MomentumAgent import MomentumAgent
 from agent.examples.MarketReplayAgentUSD import MarketReplayAgentUSD
-from agent.execution.POVExecutionAgent import POVExecutionAgent
 from agent.OrderBookImbalanceAgent import OrderBookImbalanceAgent
 from model.LatencyModel import LatencyModel
 
@@ -80,7 +74,7 @@ parser.add_argument('--mm-pov',
                     default=0.025
                     )
 parser.add_argument('--mm-window-size',
-                    type=util.validate_window_size,
+                    type=__init__.validate_window_size,
                     default='adaptive'
                     )
 parser.add_argument('--mm-min-order-size',
@@ -128,7 +122,7 @@ seed = args.seed  # Random seed specification on the command line.
 if not seed: seed = int(pd.Timestamp.now().timestamp() * 1000000) % (2 ** 32 - 1)
 np.random.seed(seed)
 
-util.silent_mode = not args.verbose
+__init__.silent_mode = not args.verbose
 LimitOrder.silent_mode = not args.verbose
 
 exchange_log_orders = False#True
@@ -244,9 +238,9 @@ pairwise = (agent_count, agent_count)
 
 # All agents sit on line from my PC to MICEX
 me_to_micex_meters = 10000
-pairwise_distances = util.generate_uniform_random_pairwise_dist_on_line(0.0, me_to_micex_meters, agent_count,
-                                                                        random_state=latency_rstate)
-pairwise_latencies = util.meters_to_light_ns(pairwise_distances)
+pairwise_distances = __init__.generate_uniform_random_pairwise_dist_on_line(0.0, me_to_micex_meters, agent_count,
+                                                                            random_state=latency_rstate)
+pairwise_latencies = __init__.meters_to_light_ns(pairwise_distances)
 
 model_args = {
     'connected': True,

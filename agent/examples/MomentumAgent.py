@@ -1,6 +1,7 @@
-from agent.TradingAgent import TradingAgent
-import pandas as pd
 import numpy as np
+import pandas as pd
+
+from agent.TradingAgent import TradingAgent
 
 
 class MomentumAgent(TradingAgent):
@@ -62,7 +63,7 @@ class MomentumAgent(TradingAgent):
             if len(self.mid_list) > 50: self.avg_50_list.append(MomentumAgent.ma(self.mid_list, n=50)[-1].round(2))
             if len(self.avg_20_list) > 0 and len(self.avg_50_list) > 0:
                 if self.avg_20_list[-1] >= self.avg_50_list[-1] and 'CASH' in self.holdings and \
-                self.holdings['CASH'] >= self.size * ask:
+                        self.holdings['CASH'] >= self.size * ask:
                     self.placeLimitOrder(self.symbol, quantity=self.size, is_buy_order=True, limit_price=ask)
                 else:
                     if self.is_short:
@@ -71,7 +72,6 @@ class MomentumAgent(TradingAgent):
                         self.placeLimitOrder(self.symbol, quantity=self.size, is_buy_order=False, limit_price=bid)
                     else:
                         None
-
 
     def getWakeFrequency(self):
         return pd.Timedelta(self.wake_up_freq)

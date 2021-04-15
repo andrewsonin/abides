@@ -3,7 +3,7 @@ import sys
 import numpy as np
 
 from agent.ZeroIntelligenceAgent import ZeroIntelligenceAgent
-from util.util import log_print
+from util import log_print
 
 np.set_printoptions(threshold=np.inf)
 

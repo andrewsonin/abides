@@ -1,6 +1,6 @@
 from agent.TradingAgent import TradingAgent
 import pandas as pd
-from util.util import log_print
+from util.__init__ import log_print
 
 
 DEFAULT_LEVELS_QUOTE_DICT = {1: [1, 0, 0, 0, 0],
