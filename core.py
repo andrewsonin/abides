@@ -106,6 +106,8 @@ class Kernel(Generic[_OracleType]):
         # the simulation, separate from anything like exchange open/close).
         if not isinstance(start_time, pd.Timestamp) or not isinstance(stop_time, pd.Timestamp):
             raise TypeError("'start_time' and 'stop_time' must be of type pd.Timestamp")
+        if stop_time < start_time:
+            raise ValueError("'stop_time' should be larger than 'start_time'")
         self.start_time = start_time
         self.stop_time = stop_time
 
