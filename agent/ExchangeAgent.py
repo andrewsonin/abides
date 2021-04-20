@@ -28,7 +28,7 @@ from message import (
     ModifyOrderRequest,
 
     OrderReply,
-    MarketDataSubscriptionMessage,
+    MarketDataSubscription,
     MarketDataSubscriptionRequest,
 
     MarketOpeningHourRequest,
@@ -235,14 +235,14 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
                 self.__QueryTransactedVolume(msg, sender_id, mkt_closed)
         else:
             self.logEvent(msg.type, sender_id)
-            if isinstance(msg, MarketDataSubscriptionMessage):
+            if isinstance(msg, MarketDataSubscription):
                 self.__MarketDataSubscriptionMessage(msg, sender_id, current_time)
             elif isinstance(msg, MarketOpeningHourRequest):
                 self.__MarketOpeningHourRequest(msg, sender_id)
             else:
                 log_print(f"{self.name} received {msg.type}, but not handled")
 
-    def updateSubscriptionDict(self, msg: MarketDataSubscriptionMessage, current_time: pd.Timestamp) -> None:
+    def updateSubscriptionDict(self, msg: MarketDataSubscription, current_time: pd.Timestamp) -> None:
         # The subscription dict is a dictionary with the key = agent ID,
         # value = dict (key = symbol, value = list [levels (no of levels to receive updates for),
         # frequency (min number of ns between messages), last agent update timestamp]
@@ -290,8 +290,9 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
 
     def logOrderBookSnapshots(self, symbol: str) -> None:
         """
-        Log full depth quotes (price, volume) from this order book at some pre-determined frequency. Here we are looking at
-        the actual log for this order book (i.e. are there snapshots to export, independent of the requested frequency).
+        Log full depth quotes (price, volume) from this order book at some pre-determined frequency.
+        Here we are looking at the actual log for this order book (i.e. are there snapshots to export,
+        independent of the requested frequency).
         """
 
         def get_quote_range_iterator(s):
@@ -509,7 +510,7 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
                 symbol,
                 mkt_closed,
                 length,
-                self.order_books[symbol].history[1:length + 1]
+                self.order_books[symbol].history[1:(length + 1)]
             )
         )
 
@@ -533,7 +534,7 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
         )
 
     def __MarketDataSubscriptionMessage(self,
-                                        msg: MarketDataSubscriptionMessage,
+                                        msg: MarketDataSubscription,
                                         sender_id: int,
                                         current_time: pd.Timestamp) -> None:
         log_print(f"{self.name} received {msg.type} request from agent {sender_id}")
