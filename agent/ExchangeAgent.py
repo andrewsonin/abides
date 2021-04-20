@@ -197,188 +197,169 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
         # Note that computation delay MUST be updated before any calls to sendMessage.
         self.setComputationDelay(self.computation_delay)
 
+        sender_id = msg.sender_id
         mkt_closed = current_time > self.mkt_close
         # Is the exchange closed?  (This block only affects post-close, not pre-open.)
-        if mkt_closed:
-            # Most messages after close will receive a 'MKT_CLOSED' message in response.  A few things
-            # might still be processed, like requests for final trade prices or such.
-            if isinstance(msg, OrderRequest):
+        if isinstance(msg, OrderRequest):
+            if mkt_closed:
                 log_print(f"{self.name} received {msg.type}: {msg.order}")
                 self.sendMessage(msg.sender_id, MarketClosedReply(self.id))
-                # Don't do any further processing on these messages!
                 return
-            elif not isinstance(msg, Query):
-                # Specifically do allow querying after market close, so agents can get the
-                # final trade of the day as their "daily close" price for a symbol.
+            if self.log_orders:
+                self.logEvent(msg.type, msg.order.to_dict())
 
+            if isinstance(msg, LimitOrderRequest):
+                order = msg.order
+                symbol = order.symbol
+                log_print(f"{self.name} received LIMIT_ORDER: {order}")
+                if symbol not in self.order_books:
+                    log_print(f"Limit Order discarded. Unknown symbol: {symbol}")
+                else:
+                    # Hand the order to the order book for processing.
+                    self.order_books[symbol].handleLimitOrder(deepcopy(order))
+                    self.publishOrderBookData()
+            elif isinstance(msg, MarketOrderRequest):
+                order = msg.order
+                symbol = order.symbol
+                log_print(f"{self.name} received MARKET_ORDER: {order}")
+                if symbol not in self.order_books:
+                    log_print(f"Market Order discarded. Unknown symbol: {symbol}")
+                else:
+                    # Hand the market order to the order book for processing.
+                    self.order_books[symbol].handleMarketOrder(deepcopy(order))
+                    self.publishOrderBookData()
+            elif isinstance(msg, CancelOrderRequest):
+                # Note: this is somewhat open to abuse, as in theory agents could cancel other agents' orders.
+                # An agent could also become confused if they receive a (partial) execution on an order they
+                # then successfully cancel, but receive the cancel confirmation first. Things to think about
+                # for later...
+                order = msg.order
+                symbol = order.symbol
+                log_print(f"{self.name} received CANCEL_ORDER: {order}")
+                if order.symbol not in self.order_books:
+                    log_print(f"Cancellation request discarded. Unknown symbol: {symbol}")
+                else:
+                    # Hand the order to the order book for processing.
+                    self.order_books[symbol].cancelOrder(deepcopy(order))
+                    self.publishOrderBookData()
+            elif isinstance(msg, ModifyOrderRequest):
+                # Replace an existing order with a modified order. There could be some timing issues
+                # here. What if an order is partially executed, but the submitting agent has not
+                # yet received the notification, and submits a modification to the quantity of the
+                # (already partially executed) order? I guess it is okay if we just think of this
+                # as "delete and then add new" and make it the agent's problem if anything weird
+                # happens.
+                order = msg.order
+                symbol = order.symbol
+                new_order = msg.new_order
+                log_print(f"{self.name} received MODIFY_ORDER: {order}, new order: {new_order}")
+                if order.symbol not in self.order_books:
+                    log_print(f"Modification request discarded. Unknown symbol: {symbol}")
+                else:
+                    self.order_books[symbol].modifyOrder(deepcopy(order), deepcopy(new_order))
+                    self.publishOrderBookData()
+        elif isinstance(msg, Query):
+            if mkt_closed:
                 log_print(f"{self.name} received {msg.type}, discarded: market is closed.")
                 self.sendMessage(msg.sender_id, MarketClosedReply(self.id))
                 # Don't do any further processing on these messages!
                 return
+            self.logEvent(msg.type, sender_id)
+            symbol = msg.symbol
 
-        sender_id = msg.sender_id
-        # Log order messages only if that option is configured.  Log all other messages.
-        if isinstance(msg, OrderRequest):
-            if self.log_orders:
-                self.logEvent(msg.type, msg.order.to_dict())
+            if isinstance(msg, QueryLastTrade):
+                if symbol not in self.order_books:
+                    log_print(f"Last trade request discarded. Unknown symbol: {symbol}")
+                else:
+                    log_print(f"{self.name} received QUERY_LAST_TRADE ({symbol}) request from agent {sender_id}")
+
+                    # Return the single last executed trade price (currently not volume) for the requested symbol.
+                    # This will return the average share price if multiple executions resulted from a single order.
+                    self.sendMessage(
+                        sender_id,
+                        QueryLastTradeReply(
+                            self.id,
+                            symbol,
+                            mkt_closed,
+                            self.order_books[symbol].last_trade
+                        )
+                    )
+            elif isinstance(msg, QuerySpread):
+                depth = msg.depth
+                if symbol not in self.order_books:
+                    log_print(f"Bid-ask spread request discarded. Unknown symbol: {symbol}")
+                else:
+                    log_print(f"{self.name} received {self.type} ({symbol}:{depth}) request from agent {sender_id}")
+
+                    # Return the requested depth on both sides of the order book for the requested symbol.
+                    # Returns price levels and aggregated volume at each level (not individual orders).
+                    order_book = self.order_books[symbol]
+                    self.sendMessage(
+                        sender_id,
+                        QueryLastSpreadReply(
+                            self.id,
+                            symbol,
+                            mkt_closed,
+                            depth,
+                            bids=order_book.getInsideBids(depth),
+                            asks=order_book.getInsideAsks(depth),
+                            data=order_book.last_trade,
+                            book=''
+                        )
+                    )
+            elif isinstance(msg, QueryOrderStream):
+                length = msg.length
+                if symbol not in self.order_books:
+                    log_print(f"Order stream request discarded. Unknown symbol: {symbol}")
+                else:
+                    log_print(f"{self.name} received {self.type} ({symbol}:{length}) request from agent {sender_id}")
+
+                # We return indices [1:length] inclusive because the agent will want "orders leading up to the last
+                # L trades", and the items under index 0 are more recent than the last trade.
+                self.sendMessage(
+                    sender_id,
+                    QueryOrderStreamReply(
+                        self.id,
+                        symbol,
+                        mkt_closed,
+                        length,
+                        self.order_books[symbol].history[1:length + 1])
+                )
+            elif isinstance(msg, QueryTransactedVolume):
+                lookback_period = msg.lookback_period
+                if symbol not in self.order_books:
+                    log_print(f"Order stream request discarded. Unknown symbol: {symbol}")
+                else:
+                    log_print(
+                        f"{self.name} received {self.type} ({symbol}:{lookback_period}) request from agent {sender_id}"
+                    )
+                self.sendMessage(
+                    sender_id,
+                    QueryTransactedVolumeReply(
+                        self.id,
+                        symbol,
+                        mkt_closed,
+                        self.order_books[symbol].get_transacted_volume(lookback_period)
+                    )
+                )
         else:
             self.logEvent(msg.type, sender_id)
+            if isinstance(msg, MarketDataSubscriptionMessage):
+                log_print(f"{self.name} received {msg.type} request from agent {sender_id}")
+            elif isinstance(msg, MarketOpeningHourRequest):
+                log_print(f"{self.name} received {msg.type} request from agent {sender_id}")
 
-        # Handle the DATA SUBSCRIPTION request and cancellation messages from the agents.
-        if isinstance(msg, MarketDataSubscriptionMessage):
-            log_print(f"{self.name} received {msg.type} request from agent {sender_id}")
-            self.updateSubscriptionDict(msg, current_time)
-        # Handle all message types understood by this exchange.
-        elif isinstance(msg, MarketOpeningHourRequest):
-            log_print(f"{self.name} received {msg.type} request from agent {sender_id}")
-
-            # The exchange is permitted to respond to requests for simple immutable data (like "what are your
-            # hours?") instantly.  This does NOT include anything that queries mutable data, like equity
-            # quotes or trades.
-            self.setComputationDelay(0)
-            if isinstance(msg, WhenMktOpen):
-                reply: MarketOpeningHourReply = WhenMktOpenReply(self.id, self.mkt_open)
+                # The exchange is permitted to respond to requests for simple immutable data (like "what are your
+                # hours?") instantly.  This does NOT include anything that queries mutable data, like equity
+                # quotes or trades.
+                self.setComputationDelay(0)
+                if isinstance(msg, WhenMktOpen):
+                    reply: MarketOpeningHourReply = WhenMktOpenReply(self.id, self.mkt_open)
+                else:
+                    reply = WhenMktCloseReply(self.id, self.mkt_close)
+                self.sendMessage(sender_id, reply)
             else:
-                reply = WhenMktCloseReply(self.id, self.mkt_close)
-            self.sendMessage(sender_id, reply)
-
-        elif isinstance(msg, QueryLastTrade):
-            symbol = msg.symbol
-            if symbol not in self.order_books:
-                log_print(f"Last trade request discarded. Unknown symbol: {symbol}")
-            else:
-                log_print(f"{self.name} received QUERY_LAST_TRADE ({symbol}) request from agent {sender_id}")
-
-                # Return the single last executed trade price (currently not volume) for the requested symbol.
-                # This will return the average share price if multiple executions resulted from a single order.
-                self.sendMessage(
-                    sender_id,
-                    QueryLastTradeReply(
-                        self.id,
-                        symbol,
-                        mkt_closed,
-                        self.order_books[symbol].last_trade
-                    )
-                )
-        elif isinstance(msg, QuerySpread):
-            symbol = msg.symbol
-            depth = msg.depth
-            if symbol not in self.order_books:
-                log_print(f"Bid-ask spread request discarded. Unknown symbol: {symbol}")
-            else:
-                log_print(f"{self.name} received {self.type} ({symbol}:{depth}) request from agent {sender_id}")
-
-                # Return the requested depth on both sides of the order book for the requested symbol.
-                # Returns price levels and aggregated volume at each level (not individual orders).
-                order_book = self.order_books[symbol]
-                self.sendMessage(
-                    sender_id,
-                    QueryLastSpreadReply(
-                        self.id,
-                        symbol,
-                        mkt_closed,
-                        depth,
-                        bids=order_book.getInsideBids(depth),
-                        asks=order_book.getInsideAsks(depth),
-                        data=order_book.last_trade,
-                        book=''
-                    )
-                )
-
-        # It is possible to also send the pretty-printed order book to the agent for logging,
-        # but forcing pretty-printing of a large order book is very slow, so we should only do it with good reason.
-        # We don't currently have a configurable option for it.
-        # "book": self.order_books[symbol].prettyPrint(silent=True) }))
-        elif isinstance(msg, QueryOrderStream):
-            symbol = msg.symbol
-            length = msg.length
-
-            if symbol not in self.order_books:
-                log_print(f"Order stream request discarded. Unknown symbol: {symbol}")
-            else:
-                log_print(f"{self.name} received {self.type} ({symbol}:{length}) request from agent {sender_id}")
-
-            # We return indices [1:length] inclusive because the agent will want "orders leading up to the last
-            # L trades", and the items under index 0 are more recent than the last trade.
-            self.sendMessage(
-                sender_id,
-                QueryOrderStreamReply(
-                    self.id,
-                    symbol,
-                    mkt_closed,
-                    length,
-                    self.order_books[symbol].history[1:length + 1])
-            )
-        elif isinstance(msg, QueryTransactedVolume):
-            symbol = msg.symbol
-            lookback_period = msg.lookback_period
-            if symbol not in self.order_books:
-                log_print(f"Order stream request discarded. Unknown symbol: {symbol}")
-            else:
-                log_print(
-                    f"{self.name} received {self.type} ({symbol}:{lookback_period}) request from agent {sender_id}"
-                )
-            self.sendMessage(
-                sender_id,
-                QueryTransactedVolumeReply(
-                    self.id,
-                    symbol,
-                    mkt_closed,
-                    self.order_books[symbol].get_transacted_volume(lookback_period)
-                )
-            )
-        elif isinstance(msg, LimitOrderRequest):
-            order = msg.order
-            symbol = order.symbol
-            log_print(f"{self.name} received LIMIT_ORDER: {order}")
-            if symbol not in self.order_books:
-                log_print(f"Limit Order discarded. Unknown symbol: {symbol}")
-            else:
-                # Hand the order to the order book for processing.
-                self.order_books[symbol].handleLimitOrder(deepcopy(order))
-                self.publishOrderBookData()
-        elif isinstance(msg, MarketOrderRequest):
-            order = msg.order
-            symbol = order.symbol
-            log_print(f"{self.name} received MARKET_ORDER: {order}")
-            if symbol not in self.order_books:
-                log_print(f"Market Order discarded. Unknown symbol: {symbol}")
-            else:
-                # Hand the market order to the order book for processing.
-                self.order_books[symbol].handleMarketOrder(deepcopy(order))
-                self.publishOrderBookData()
-        elif isinstance(msg, CancelOrderRequest):
-            # Note: this is somewhat open to abuse, as in theory agents could cancel other agents' orders.
-            # An agent could also become confused if they receive a (partial) execution on an order they
-            # then successfully cancel, but receive the cancel confirmation first. Things to think about
-            # for later...
-            order = msg.order
-            symbol = order.symbol
-            log_print(f"{self.name} received CANCEL_ORDER: {order}")
-            if order.symbol not in self.order_books:
-                log_print(f"Cancellation request discarded. Unknown symbol: {symbol}")
-            else:
-                # Hand the order to the order book for processing.
-                self.order_books[symbol].cancelOrder(deepcopy(order))
-                self.publishOrderBookData()
-        elif isinstance(msg, ModifyOrderRequest):
-            # Replace an existing order with a modified order. There could be some timing issues
-            # here. What if an order is partially executed, but the submitting agent has not
-            # yet received the notification, and submits a modification to the quantity of the
-            # (already partially executed) order? I guess it is okay if we just think of this
-            # as "delete and then add new" and make it the agent's problem if anything weird
-            # happens.
-            order = msg.order
-            symbol = order.symbol
-            new_order = msg.new_order
-            log_print(f"{self.name} received MODIFY_ORDER: {order}, new order: {new_order}")
-            if order.symbol not in self.order_books:
-                log_print(f"Modification request discarded. Unknown symbol: {symbol}")
-            else:
-                self.order_books[symbol].modifyOrder(deepcopy(order), deepcopy(new_order))
-                self.publishOrderBookData()
-        else:
-            log_print(f"{self.name} received {msg.type}, but not handled")
+                log_print(f"{self.name} received {msg.type}, but not handled")
 
     def updateSubscriptionDict(self, msg: MarketDataSubscriptionMessage, current_time: pd.Timestamp) -> None:
         # The subscription dict is a dictionary with the key = agent ID,
