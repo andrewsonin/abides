@@ -15,7 +15,42 @@ import pandas as pd
 from OrderBook import OrderBook
 from agent.FinancialAgent import FinancialAgent
 from core import Kernel
-from message import Message, MarketClosedMessage
+from message import (
+    MessageAbstractBase,
+    Message,
+
+    MarketClosedReply,
+
+    OrderRequest,
+    LimitOrderRequest,
+    MarketOrderRequest,
+    CancelOrderRequest,
+    ModifyOrderRequest,
+
+    OrderReply,
+    MarketDataSubscriptionMessage,
+    MarketDataSubscriptionRequest,
+
+    MarketOpeningHourRequest,
+    WhenMktOpen,
+
+    MarketOpeningHourReply,
+    WhenMktOpenReply,
+    WhenMktCloseReply,
+
+    Query,
+    QueryLastTrade,
+    QuerySpread,
+    QueryOrderStream,
+    QueryTransactedVolume,
+
+    QueryLastTradeReply,
+    QueryLastSpreadReply,
+    QueryOrderStreamReply,
+    QueryTransactedVolumeReply,
+
+    MarketData
+)
 from oracle.DataOracle import DataOracle
 from oracle.ExternalFileOracle import ExternalFileOracle
 from oracle.SparseMeanRevertingOracle import SparseMeanRevertingOracle
@@ -162,60 +197,53 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
         # Note that computation delay MUST be updated before any calls to sendMessage.
         self.setComputationDelay(self.computation_delay)
 
-        msg_body = msg.body
-        msg_type = msg_body['msg']
+        mkt_closed = current_time > self.mkt_close
         # Is the exchange closed?  (This block only affects post-close, not pre-open.)
-        if current_time > self.mkt_close:
+        if mkt_closed:
             # Most messages after close will receive a 'MKT_CLOSED' message in response.  A few things
             # might still be processed, like requests for final trade prices or such.
-            if msg_type in {'LIMIT_ORDER', 'MARKET_ORDER', 'CANCEL_ORDER', 'MODIFY_ORDER'}:
-                log_print(f"{self.name} received {msg_type}: {msg_body['order']}")
-                self.sendMessage(msg_body['sender'], MarketClosedMessage())
-
+            if isinstance(msg, OrderRequest):
+                log_print(f"{self.name} received {msg.type}: {msg.order}")
+                self.sendMessage(msg.sender_id, MarketClosedReply(self.id))
                 # Don't do any further processing on these messages!
                 return
-            elif 'QUERY' not in msg_type:
+            elif not isinstance(msg, Query):
                 # Specifically do allow querying after market close, so agents can get the
                 # final trade of the day as their "daily close" price for a symbol.
 
-                log_print(f"{self.name} received {msg_type}, discarded: market is closed.")
-                self.sendMessage(msg_body['sender'], Message({"msg": "MKT_CLOSED"}))
+                log_print(f"{self.name} received {msg.type}, discarded: market is closed.")
+                self.sendMessage(msg.sender_id, MarketClosedReply(self.id))
                 # Don't do any further processing on these messages!
                 return
 
-        sender_id = msg_body['sender']
+        sender_id = msg.sender_id
         # Log order messages only if that option is configured.  Log all other messages.
-        if msg_type in {'LIMIT_ORDER', 'MARKET_ORDER', 'CANCEL_ORDER', 'MODIFY_ORDER'}:
+        if isinstance(msg, OrderRequest):
             if self.log_orders:
-                self.logEvent(msg_type, msg_body['order'].to_dict())
+                self.logEvent(msg.type, msg.order.to_dict())
         else:
-            self.logEvent(msg_type, sender_id)
+            self.logEvent(msg.type, sender_id)
 
         # Handle the DATA SUBSCRIPTION request and cancellation messages from the agents.
-        if msg_type in {"MARKET_DATA_SUBSCRIPTION_REQUEST", "MARKET_DATA_SUBSCRIPTION_CANCELLATION"}:
-            log_print(f"{self.name} received {msg_type} request from agent {sender_id}")
+        if isinstance(msg, MarketDataSubscriptionMessage):
+            log_print(f"{self.name} received {msg.type} request from agent {sender_id}")
             self.updateSubscriptionDict(msg, current_time)
         # Handle all message types understood by this exchange.
-        elif msg_type == "WHEN_MKT_OPEN":
-            log_print(f"{self.name} received WHEN_MKT_OPEN request from agent {sender_id}")
+        elif isinstance(msg, MarketOpeningHourRequest):
+            log_print(f"{self.name} received {msg.type} request from agent {sender_id}")
 
             # The exchange is permitted to respond to requests for simple immutable data (like "what are your
             # hours?") instantly.  This does NOT include anything that queries mutable data, like equity
             # quotes or trades.
             self.setComputationDelay(0)
-            self.sendMessage(sender_id, Message({"msg": "WHEN_MKT_OPEN", "data": self.mkt_open}))
+            if isinstance(msg, WhenMktOpen):
+                reply: MarketOpeningHourReply = WhenMktOpenReply(self.id, self.mkt_open)
+            else:
+                reply = WhenMktCloseReply(self.id, self.mkt_close)
+            self.sendMessage(sender_id, reply)
 
-        elif msg_type == "WHEN_MKT_CLOSE":
-            log_print(f"{self.name} received WHEN_MKT_CLOSE request from agent {sender_id}")
-
-            # The exchange is permitted to respond to requests for simple immutable data (like "what are your
-            # hours?") instantly.  This does NOT include anything that queries mutable data, like equity
-            # quotes or trades.
-            self.setComputationDelay(0)
-            self.sendMessage(sender_id, Message({"msg": "WHEN_MKT_CLOSE", "data": self.mkt_close}))
-
-        elif msg_type == "QUERY_LAST_TRADE":
-            symbol = msg_body['symbol']
+        elif isinstance(msg, QueryLastTrade):
+            symbol = msg.symbol
             if symbol not in self.order_books:
                 log_print(f"Last trade request discarded. Unknown symbol: {symbol}")
             else:
@@ -225,39 +253,35 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
                 # This will return the average share price if multiple executions resulted from a single order.
                 self.sendMessage(
                     sender_id,
-                    Message(
-                        {
-                            "msg": "QUERY_LAST_TRADE",
-                            "symbol": symbol,
-                            "data": self.order_books[symbol].last_trade,
-                            "mkt_closed": current_time > self.mkt_close
-                        }
+                    QueryLastTradeReply(
+                        self.id,
+                        symbol,
+                        mkt_closed,
+                        self.order_books[symbol].last_trade
                     )
                 )
-        elif msg_type == "QUERY_SPREAD":
-            symbol = msg_body['symbol']
-            depth = msg_body['depth']
+        elif isinstance(msg, QuerySpread):
+            symbol = msg.symbol
+            depth = msg.depth
             if symbol not in self.order_books:
-                log_print(f"Bid-ask spread request discarded.  Unknown symbol: {symbol}")
+                log_print(f"Bid-ask spread request discarded. Unknown symbol: {symbol}")
             else:
-                log_print(f"{self.name} received QUERY_SPREAD ({symbol}:{depth}) request from agent {sender_id}")
+                log_print(f"{self.name} received {self.type} ({symbol}:{depth}) request from agent {sender_id}")
 
                 # Return the requested depth on both sides of the order book for the requested symbol.
                 # Returns price levels and aggregated volume at each level (not individual orders).
                 order_book = self.order_books[symbol]
                 self.sendMessage(
                     sender_id,
-                    Message(
-                        {
-                            "msg": "QUERY_SPREAD",
-                            "symbol": symbol,
-                            "depth": depth,
-                            "bids": order_book.getInsideBids(depth),
-                            "asks": order_book.getInsideAsks(depth),
-                            "data": order_book.last_trade,
-                            "mkt_closed": current_time > self.mkt_close,
-                            "book": ''
-                        }
+                    QueryLastSpreadReply(
+                        self.id,
+                        symbol,
+                        mkt_closed,
+                        depth,
+                        bids=order_book.getInsideBids(depth),
+                        asks=order_book.getInsideAsks(depth),
+                        data=order_book.last_trade,
+                        book=''
                     )
                 )
 
@@ -265,52 +289,46 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
         # but forcing pretty-printing of a large order book is very slow, so we should only do it with good reason.
         # We don't currently have a configurable option for it.
         # "book": self.order_books[symbol].prettyPrint(silent=True) }))
-        elif msg_type == "QUERY_ORDER_STREAM":
-            symbol = msg.body['symbol']
-            length = msg.body['length']
+        elif isinstance(msg, QueryOrderStream):
+            symbol = msg.symbol
+            length = msg.length
 
             if symbol not in self.order_books:
-                log_print(f"Order stream request discarded.  Unknown symbol: {symbol}")
+                log_print(f"Order stream request discarded. Unknown symbol: {symbol}")
             else:
-                log_print(f"{self.name} received QUERY_ORDER_STREAM ({symbol}:{length}) request from agent {sender_id}")
+                log_print(f"{self.name} received {self.type} ({symbol}:{length}) request from agent {sender_id}")
 
             # We return indices [1:length] inclusive because the agent will want "orders leading up to the last
             # L trades", and the items under index 0 are more recent than the last trade.
             self.sendMessage(
                 sender_id,
-                Message(
-                    {
-                        "msg": "QUERY_ORDER_STREAM",
-                        "symbol": symbol,
-                        "length": length,
-                        "mkt_closed": current_time > self.mkt_close,
-                        "orders": self.order_books[symbol].history[1:length + 1]
-                    }
-                )
+                QueryOrderStreamReply(
+                    self.id,
+                    symbol,
+                    mkt_closed,
+                    length,
+                    self.order_books[symbol].history[1:length + 1])
             )
-        elif msg_type == 'QUERY_TRANSACTED_VOLUME':
-            symbol = msg.body['symbol']
-            lookback_period = msg.body['lookback_period']
+        elif isinstance(msg, QueryTransactedVolume):
+            symbol = msg.symbol
+            lookback_period = msg.lookback_period
             if symbol not in self.order_books:
-                log_print(f"Order stream request discarded.  Unknown symbol: {symbol}")
+                log_print(f"Order stream request discarded. Unknown symbol: {symbol}")
             else:
                 log_print(
-                    f"{self.name} received QUERY_TRANSACTED_VOLUME ({symbol}:{lookback_period}) "
-                    f"request from agent {sender_id}"
+                    f"{self.name} received {self.type} ({symbol}:{lookback_period}) request from agent {sender_id}"
                 )
             self.sendMessage(
                 sender_id,
-                Message(
-                    {
-                        "msg": "QUERY_TRANSACTED_VOLUME",
-                        "symbol": symbol,
-                        "transacted_volume": self.order_books[symbol].get_transacted_volume(lookback_period),
-                        "mkt_closed": current_time > self.mkt_close
-                    }
+                QueryTransactedVolumeReply(
+                    self.id,
+                    symbol,
+                    mkt_closed,
+                    self.order_books[symbol].get_transacted_volume(lookback_period)
                 )
             )
-        elif msg_type == "LIMIT_ORDER":
-            order = msg.body['order']
+        elif isinstance(msg, LimitOrderRequest):
+            order = msg.order
             symbol = order.symbol
             log_print(f"{self.name} received LIMIT_ORDER: {order}")
             if symbol not in self.order_books:
@@ -319,8 +337,8 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
                 # Hand the order to the order book for processing.
                 self.order_books[symbol].handleLimitOrder(deepcopy(order))
                 self.publishOrderBookData()
-        elif msg_type == "MARKET_ORDER":
-            order = msg.body['order']
+        elif isinstance(msg, MarketOrderRequest):
+            order = msg.order
             symbol = order.symbol
             log_print(f"{self.name} received MARKET_ORDER: {order}")
             if symbol not in self.order_books:
@@ -329,12 +347,12 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
                 # Hand the market order to the order book for processing.
                 self.order_books[symbol].handleMarketOrder(deepcopy(order))
                 self.publishOrderBookData()
-        elif msg_type == "CANCEL_ORDER":
+        elif isinstance(msg, CancelOrderRequest):
             # Note: this is somewhat open to abuse, as in theory agents could cancel other agents' orders.
             # An agent could also become confused if they receive a (partial) execution on an order they
             # then successfully cancel, but receive the cancel confirmation first. Things to think about
             # for later...
-            order = msg.body['order']
+            order = msg.order
             symbol = order.symbol
             log_print(f"{self.name} received CANCEL_ORDER: {order}")
             if order.symbol not in self.order_books:
@@ -343,39 +361,35 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
                 # Hand the order to the order book for processing.
                 self.order_books[symbol].cancelOrder(deepcopy(order))
                 self.publishOrderBookData()
-        elif msg_type == 'MODIFY_ORDER':
+        elif isinstance(msg, ModifyOrderRequest):
             # Replace an existing order with a modified order. There could be some timing issues
             # here. What if an order is partially executed, but the submitting agent has not
             # yet received the notification, and submits a modification to the quantity of the
             # (already partially executed) order? I guess it is okay if we just think of this
             # as "delete and then add new" and make it the agent's problem if anything weird
             # happens.
-            order = msg.body['order']
+            order = msg.order
             symbol = order.symbol
-            new_order = msg.body['new_order']
+            new_order = msg.new_order
             log_print(f"{self.name} received MODIFY_ORDER: {order}, new order: {new_order}")
             if order.symbol not in self.order_books:
                 log_print(f"Modification request discarded. Unknown symbol: {symbol}")
             else:
                 self.order_books[symbol].modifyOrder(deepcopy(order), deepcopy(new_order))
                 self.publishOrderBookData()
+        else:
+            log_print(f"{self.name} received {msg.type}, but not handled")
 
-    def updateSubscriptionDict(self, msg: Message, current_time: pd.Timestamp) -> None:
+    def updateSubscriptionDict(self, msg: MarketDataSubscriptionMessage, current_time: pd.Timestamp) -> None:
         # The subscription dict is a dictionary with the key = agent ID,
-        # value = dict (key = symbol, value = list [levels (no of levels to recieve updates for),
+        # value = dict (key = symbol, value = list [levels (no of levels to receive updates for),
         # frequency (min number of ns between messages), last agent update timestamp]
         # e.g. {101 : {'AAPL' : [1, 10, pd.Timestamp(10:00:00)}}
-        msg_body = msg.body
-        msg_type = msg_body['msg']
-        if msg_type == "MARKET_DATA_SUBSCRIPTION_REQUEST":
-            agent_id = msg_body['sender']
-            symbol = msg_body['symbol']
-            levels = msg_body['levels']
-            freq = msg_body['freq']
-            self.subscription_dict[agent_id] = {symbol: (levels, freq, current_time)}
-        elif msg_type == "MARKET_DATA_SUBSCRIPTION_CANCELLATION":
-            agent_id = msg_body['sender']
-            symbol = msg_body['symbol']
+        agent_id = msg.sender_id
+        symbol = msg.symbol
+        if isinstance(msg, MarketDataSubscriptionRequest):
+            self.subscription_dict[agent_id] = {symbol: (msg.levels, msg.freq, current_time)}
+        else:
             del self.subscription_dict[agent_id][symbol]
 
     def publishOrderBookData(self) -> None:
@@ -386,27 +400,29 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
         2) order book update timestamp > last time agent was updated AND the orderbook update time stamp is greater than
         the last agent update time stamp by a period more than that specified in the freq parameter.
         """
-        for agent_id, params in self.subscription_dict.items():
+        current_time = self.current_time
+        exchange_id = self.id
+        subscription_dict = self.subscription_dict
+        order_books = self.order_books
+        for agent_id, params in subscription_dict.items():
             for symbol, (levels, freq, last_agent_update) in params.items():
-                order_book = self.order_books[symbol]
+                order_book = order_books[symbol]
                 orderbook_last_update = order_book.last_update_ts
                 if freq == 0 or \
                         orderbook_last_update > last_agent_update \
                         and (orderbook_last_update - last_agent_update).delta >= freq:
                     self.sendMessage(
                         agent_id,
-                        Message(
-                            {
-                                "msg": "MARKET_DATA",
-                                "symbol": symbol,
-                                "bids": order_book.getInsideBids(levels),
-                                "asks": order_book.getInsideAsks(levels),
-                                "last_transaction": order_book.last_trade,
-                                "exchange_ts": self.current_time
-                            }
+                        MarketData(
+                            exchange_id,
+                            symbol,
+                            order_book.last_trade,
+                            current_time,
+                            bids=order_book.getInsideBids(levels),
+                            asks=order_book.getInsideAsks(levels)
                         )
                     )
-                    agent_subscriptions = self.subscription_dict[agent_id]
+                    agent_subscriptions = subscription_dict[agent_id]
                     levels, freq, _ = agent_subscriptions[symbol]
                     agent_subscriptions[symbol] = (levels, freq, orderbook_last_update)
 
@@ -493,20 +509,18 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
             self.writeLog(df, filename=filename)
             print("Order book logging complete!")
 
-    def sendMessage(self, recipient_id: int, msg: Message, delay: int = 0) -> None:
+    def sendMessage(self, recipient_id: int, msg: MessageAbstractBase, delay: int = 0) -> None:
         # The ExchangeAgent automatically applies appropriate parallel processing pipeline delay
         # to those message types which require it.
         # TODO: probably organize the order types into categories once there are more, so we can
         # take action by category (e.g. ORDER-related messages) instead of enumerating all message
         # types to be affected.
-        msg_body = msg.body
-        msg_type = msg_body['msg']
-        if msg_type in {'ORDER_ACCEPTED', 'ORDER_CANCELLED', 'ORDER_EXECUTED'}:
+        if isinstance(msg, OrderReply):
             # Messages that require order book modification (not simple queries) incur the additional
             # parallel processing delay as configured.
             super().sendMessage(recipient_id, msg, self.pipeline_delay)
             if self.log_orders:
-                self.logEvent(msg_type, msg_body['order'].to_dict())
+                self.logEvent(msg.type, msg.order.to_dict())
         else:
             # Other message types incur only the currently-configured computation delay for this agent.
             super().sendMessage(recipient_id, msg)
