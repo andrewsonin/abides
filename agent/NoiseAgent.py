@@ -11,8 +11,8 @@ class NoiseAgent(TradingAgent):
                  log_orders=False, log_to_file=True, random_state=None, wakeup_time=None):
 
         # Base class init.
-        super().__init__(id, name, type, starting_cash=starting_cash, log_orders=log_orders,
-                         log_to_file=log_to_file, random_state=random_state)
+        super().__init__(id, name, random_state=random_state, starting_cash=starting_cash, log_orders=log_orders,
+                         log_to_file=log_to_file)
 
         self.wakeup_time = wakeup_time,
 

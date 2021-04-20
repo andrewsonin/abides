@@ -11,7 +11,7 @@ class ExecutionAgent(TradingAgent):
     def __init__(self, id, name, type, symbol, starting_cash,
                  direction, quantity, execution_time_horizon,
                  trade=True, log_orders=False, random_state=None):
-        super().__init__(id, name, type, starting_cash=starting_cash, log_orders=log_orders, random_state=random_state)
+        super().__init__(id, name, random_state=random_state, starting_cash=starting_cash, log_orders=log_orders)
         self.symbol = symbol
         self.direction = direction
         self.quantity = quantity

@@ -1,23 +1,23 @@
-### The SparseMeanRevertingOracle produces a fundamental value time series for
-### each requested symbol, and provides noisy observations of the fundamental
-### value upon agent request.  This "sparse discrete" fundamental uses a
-### combination of two processes to produce relatively realistic synthetic
-### "values": a continuous mean-reverting Ornstein-Uhlenbeck process plus
-### periodic "megashocks" which arrive following a Poisson process and have
-### magnitude drawn from a bimodal normal distribution (overall mean zero,
-### but with modes well away from zero).  This is necessary because OU itself
-### is a single noisy return to the mean (from a perturbed initial state)
-### that does not then depart the mean except in terms of minor "noise".
+# The SparseMeanRevertingOracle produces a fundamental value time series for
+# each requested symbol, and provides noisy observations of the fundamental
+# value upon agent request.  This "sparse discrete" fundamental uses a
+# combination of two processes to produce relatively realistic synthetic
+# "values": a continuous mean-reverting Ornstein-Uhlenbeck process plus
+# periodic "megashocks" which arrive following a Poisson process and have
+# magnitude drawn from a bimodal normal distribution (overall mean zero,
+# but with modes well away from zero).  This is necessary because OU itself
+# is a single noisy return to the mean (from a perturbed initial state)
+# that does not then depart the mean except in terms of minor "noise".
 
-### Historical dates are effectively meaningless to this oracle.  It is driven by
-### the numpy random number seed contained within the experimental config file.
-### This oracle uses the nanoseconds portion of the current simulation time as
-### discrete "time steps".
+# Historical dates are effectively meaningless to this oracle.  It is driven by
+# the numpy random number seed contained within the experimental config file.
+# This oracle uses the nanoseconds portion of the current simulation time as
+# discrete "time steps".
 
-### This version of the MeanRevertingOracle expects agent activity to be spread
-### across a large amount of time, with relatively sparse activity.  That is,
-### agents each acting at realistic "retail" intervals, on the order of seconds
-### or minutes, spread out across the day.
+# This version of the MeanRevertingOracle expects agent activity to be spread
+# across a large amount of time, with relatively sparse activity.  That is,
+# agents each acting at realistic "retail" intervals, on the order of seconds
+# or minutes, spread out across the day.
 
 import datetime as dt
 from math import exp, sqrt
@@ -30,6 +30,10 @@ from util import log_print
 
 
 class SparseMeanRevertingOracle(MeanRevertingOracle):
+    __slots__ = (
+        "f_log",
+        "megashocks"
+    )
 
     def __init__(self, mkt_open, mkt_close, symbols):
         # Symbols must be a dictionary of dictionaries with outer keys as symbol names and
@@ -173,7 +177,7 @@ class SparseMeanRevertingOracle(MeanRevertingOracle):
         # currentTime), then finally advance using the OU process to the requested time.
         v = self.compute_fundamental_at_timestamp(currentTime, 0, symbol, pt, pv)
 
-        return (v)
+        return v
 
     # Return the daily open price for the symbol given.  In the case of the MeanRevertingOracle,
     # this will simply be the first fundamental value, which is also the fundamental mean.
@@ -202,12 +206,12 @@ class SparseMeanRevertingOracle(MeanRevertingOracle):
     # Each agent must pass its RandomState object to observePrice.  This ensures that
     # each agent will receive the same answers across multiple same-seed simulations
     # even if a new agent has been added to the experiment.
-    def observePrice(self, symbol, currentTime, sigma_n=1000, random_state=None):
+    def observePrice(self, symbol, current_time, sigma_n=1000, random_state=None):
         # If the request is made after market close, return the close price.
-        if currentTime >= self.mkt_close:
+        if current_time >= self.mkt_close:
             r_t = self.advance_fundamental_value_series(self.mkt_close - pd.Timedelta('1ns'), symbol)
         else:
-            r_t = self.advance_fundamental_value_series(currentTime, symbol)
+            r_t = self.advance_fundamental_value_series(current_time, symbol)
 
         # Generate a noisy observation of fundamental value at the current time.
         if sigma_n == 0:
@@ -215,7 +219,7 @@ class SparseMeanRevertingOracle(MeanRevertingOracle):
         else:
             obs = int(round(random_state.normal(loc=r_t, scale=sqrt(sigma_n))))
 
-        log_print("Oracle: current fundamental value is {} at {}", r_t, currentTime)
+        log_print("Oracle: current fundamental value is {} at {}", r_t, current_time)
         log_print("Oracle: giving client value observation {}", obs)
 
         # Reminder: all simulator prices are specified in integer cents.

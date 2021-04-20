@@ -16,7 +16,7 @@ class MarketReplayAgentUSD(TradingAgent):
     def __init__(self, id, name, type, symbol, date, start_time, end_time,
                  orders_file_path, processed_orders_folder_path,
                  starting_cash, log_orders=False, random_state=None):
-        super().__init__(id, name, type, starting_cash=starting_cash, log_orders=log_orders, random_state=random_state)
+        super().__init__(id, name, random_state=random_state, starting_cash=starting_cash, log_orders=log_orders)
         self.symbol = symbol
         self.date = date
         self.log_orders = log_orders

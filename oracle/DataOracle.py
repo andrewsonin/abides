@@ -1,11 +1,11 @@
-### The DataOracle class reads real historical trade data (not price or quote)
-### from a given date in history to be resimulated.  It stores these trades
-### in a time-sorted array at maximum resolution.  It can be called by
-### certain "background" agents to obtain noisy observations about the "real"
-### price of a stock at a current time.  It is intended to provide some realistic
-### behavior and "price gravity" to the simulated market -- i.e. to make the
-### market behave something like historical reality in the absence of whatever
-### experiment we are running with more active agent types.
+# The DataOracle class reads real historical trade data (not price or quote)
+# from a given date in history to be resimulated.  It stores these trades
+# in a time-sorted array at maximum resolution.  It can be called by
+# certain "background" agents to obtain noisy observations about the "real"
+# price of a stock at a current time.  It is intended to provide some realistic
+# behavior and "price gravity" to the simulated market -- i.e. to make the
+# market behave something like historical reality in the absence of whatever
+# experiment we are running with more active agent types.
 
 import datetime as dt
 import os
@@ -14,6 +14,7 @@ from math import sqrt
 import pandas as pd
 from joblib import Memory
 
+from oracle import Oracle
 from util import log_print
 
 mem = Memory(cachedir='./cache', verbose=0)
@@ -21,7 +22,7 @@ mem = Memory(cachedir='./cache', verbose=0)
 
 # @mem.cache
 def read_trades(trade_file, symbols):
-    log_print("Data not cached.  This will take a minute...")
+    log_print("Data not cached. This will take a minute...")
 
     df = pd.read_pickle(trade_file, compression='bz2')
 
@@ -34,11 +35,10 @@ def read_trades(trade_file, symbols):
     # Ensure resulting index is sorted for best performance later on.
     df = df.sort_index()
 
-    return (df)
+    return df
 
 
-class DataOracle:
-
+class DataOracle(Oracle):
     def __init__(self, historical_date=None, symbols=None, data_dir=None):
         self.historical_date = historical_date
         self.symbols = symbols
@@ -48,11 +48,10 @@ class DataOracle:
         # Read historical trades here...
         h = historical_date
         pre = 'ct' if h.year < 2015 else 'ctm'
-        trade_file = os.path.join(data_dir, 'trades', 'trades_{}'.format(h.year),
-                                  '{}_{}{:02d}{:02d}.bgz'.format(pre, h.year, h.month, h.day))
+        trade_file = os.path.join(data_dir, 'trades', f'trades_{h.year}', f'{pre}_{h.year}{h.month:02d}{h.day:02d}.bgz')
 
-        bars_1m_file = os.path.join(data_dir, '1m_ohlc', '1m_ohlc_{}'.format(h.year),
-                                    '{}{:02d}{:02d}_ohlc_1m.bgz'.format(h.year, h.month, h.day))
+        bars_1m_file = os.path.join(data_dir, '1m_ohlc', f'1m_ohlc_{h.year}',
+                                    f'{h.year}{h.month:02d}{h.day:02d}_ohlc_1m.bgz')
 
         log_print("DataOracle initializing trades from file {}", trade_file)
         log_print("DataOracle initializing 1m bars from file {}", bars_1m_file)
@@ -115,8 +114,8 @@ class DataOracle:
     # This helps to preserve the consistency of multiple simulations with experimental
     # changes (if the oracle used a global Random object, simply adding one new agent
     # would change everyone's "noise" on all subsequent observations).
-    def observePrice(self, symbol, currentTime, sigma_n=0.0001, random_state=None):
-        last_trade_price = self.getLatestTrade(symbol, currentTime)
+    def observePrice(self, symbol, current_time, sigma_n=0.0001, random_state=None) -> int:
+        last_trade_price = self.getLatestTrade(symbol, current_time)
 
         # Noisy belief is a normal distribution around 1% the last trade price with variance
         # as requested by the agent.

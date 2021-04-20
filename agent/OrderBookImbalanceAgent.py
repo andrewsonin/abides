@@ -1,14 +1,17 @@
+from typing import Optional
+
 import matplotlib
+import numpy as np
 import pandas as pd
 
 from agent.TradingAgent import TradingAgent
 from util import log_print
 
 matplotlib.use('TkAgg')
+_1s_TimeDelta = pd.Timedelta('1s')
 
 
 class OrderBookImbalanceAgent(TradingAgent):
-
     # The OrderBookImbalanceAgent is a simple example of an agent that predicts the short term
     # price movement of a security by the preponderance of directionality in the limit order
     # book.  Specifically, it predicts the price will fall if the ratio of bid volume to total volume
@@ -25,9 +28,38 @@ class OrderBookImbalanceAgent(TradingAgent):
     #                  For example, entry_threshold=0.1 causes long entry at 0.6 or short entry at 0.4.
     # Trail Dist: how far behind the peak bid_pct should the trailing stop follow?
 
-    def __init__(self, id, name, type, symbol=None, levels=10, entry_threshold=0.17, trail_dist=0.085,
-                 freq=3600000000000, starting_cash=1000000, log_orders=True, random_state=None):
-        super().__init__(id, name, type, starting_cash=starting_cash, log_orders=log_orders, random_state=random_state)
+    __slots__ = (
+        "symbol",
+        "levels",
+        "entry_threshold",
+        "trail_dist",
+        "freq",
+        "last_market_data_update",
+        "is_long",
+        "is_short",
+        "trailing_stop",
+        "plot_me"
+    )
+
+    def __init__(self,
+                 *,
+                 agent_id: int,
+                 name: str,
+                 symbol: Optional[str] = None,
+                 levels: int = 10,
+                 entry_threshold: float = 0.17,
+                 trail_dist: float = 0.085,
+                 freq: int = 3_600_000_000_000,
+                 starting_cash: int = 1_000_000,
+                 log_orders: bool = True,
+                 random_state: Optional[np.random.RandomState] = None) -> None:
+        super().__init__(
+            agent_id=agent_id,
+            name=name,
+            random_state=random_state,
+            starting_cash=starting_cash,
+            log_orders=log_orders
+        )
         self.symbol = symbol
         self.levels = levels
         self.entry_threshold = entry_threshold
@@ -38,23 +70,24 @@ class OrderBookImbalanceAgent(TradingAgent):
         self.is_short = False
 
         self.trailing_stop = None
-        self.plotme = []
+        self.plot_me = []
 
-    def kernelStarting(self, startTime):
-        super().kernelStarting(startTime)
+    def kernelStarting(self, start_time) -> None:
+        super().kernelStarting(start_time)
 
-    def wakeup(self, currentTime):
-        super().wakeup(currentTime)
+    def wakeup(self, current_time) -> None:
+        super().wakeup(current_time)
         super().requestDataSubscription(self.symbol, levels=self.levels, freq=self.freq)
         self.setComputationDelay(1)
 
-    def receiveMessage(self, currentTime, msg):
-        super().receiveMessage(currentTime, msg)
+    def receiveMessage(self, current_time, msg) -> None:
+        super().receiveMessage(current_time, msg)
         if msg.body['msg'] == 'MARKET_DATA':
             self.cancelOrders()
 
-            self.last_market_data_update = currentTime
-            bids, asks = msg.body['bids'], msg.body['asks']
+            self.last_market_data_update = current_time
+            bids = msg.body['bids']
+            asks = msg.body['asks']
 
             bid_liq = sum(x[1] for x in bids)
             ask_liq = sum(x[1] for x in asks)
@@ -137,8 +170,8 @@ class OrderBookImbalanceAgent(TradingAgent):
                                   0.5 - self.entry_threshold, bid_pct, 0.5 + self.entry_threshold)
                         target = 0
 
-                self.plotme.append(
-                    {'currentTime': self.currentTime, 'midpoint': (asks[0][0] + bids[0][0]) / 2, 'bid_pct': bid_pct})
+                self.plot_me.append(
+                    {'currentTime': self.current_time, 'midpoint': (asks[0][0] + bids[0][0]) / 2, 'bid_pct': bid_pct})
 
             # Adjust holdings to target.
             holdings = self.holdings[self.symbol] if self.symbol in self.holdings else 0
@@ -154,12 +187,14 @@ class OrderBookImbalanceAgent(TradingAgent):
                 log_print("Adjusting holdings by {}", delta)
                 self.placeLimitOrder(self.symbol, abs(delta), direction, price)
 
-    def getWakeFrequency(self):
-        return pd.Timedelta('1s')
+    @staticmethod
+    def getWakeFrequency() -> pd.Timedelta:
+        return _1s_TimeDelta
 
     # Computes required limit price to immediately execute a trade for the specified quantity
     # of shares.
-    def computeRequiredPrice(self, direction, shares, known_bids, known_asks):
+    @staticmethod
+    def computeRequiredPrice(direction, shares, known_bids, known_asks):
         book = known_asks if direction else known_bids
 
         # Start at the inside and add up the shares.

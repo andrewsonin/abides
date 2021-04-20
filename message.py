@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Any
+
+from abides._typing import MessageBody
 
 __all__ = (
     "MessageAbstractBase",
@@ -37,7 +38,7 @@ class Message(MessageAbstractBase):
     __slots__ = ("body",)
     msg_type_priority = 0
 
-    def __init__(self, body: Any = None) -> None:
+    def __init__(self, body: MessageBody) -> None:
         # The base Message class no longer holds envelope/header information,
         # however any desired information can be placed in the arbitrary
         # body. Delivery metadata is now handled outside the message itself.
@@ -53,6 +54,36 @@ class Message(MessageAbstractBase):
         return str(self.body)
 
 
+class OrderMessage(Message):
+    __slots__ = ()
+
+
+class LimitOrderMessage(OrderMessage):
+    pass
+
+
+class MarketOrderMessage(OrderMessage):
+    pass
+
+
+class CancelOrderMessage(OrderMessage):
+    pass
+
+
+class ModifyOrderMessage(OrderMessage):
+    pass
+
+
+class MarketClosedMessage(Message):
+    __slots__ = ()
+
+    def __init__(self) -> None:
+        super().__init__({"msg": "MKT_CLOSED"})
+
+
 class WakeUp(MessageAbstractBase):
     __slots__ = ()
     msg_type_priority = 1
+
+
+print(MarketClosedMessage().body)

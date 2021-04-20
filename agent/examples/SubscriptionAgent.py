@@ -10,7 +10,7 @@ class SubscriptionAgent(TradingAgent):
     """
 
     def __init__(self, id, name, type, symbol, starting_cash, levels, freq, log_orders=False, random_state=None):
-        super().__init__(id, name, type, starting_cash=starting_cash, log_orders=log_orders, random_state=random_state)
+        super().__init__(id, name, random_state=random_state, starting_cash=starting_cash, log_orders=log_orders)
         self.symbol = symbol  # symbol traded
         self.levels = levels  # number of price levels to subscribe to/recieve updates for
         self.freq = freq  # minimum number of nanoseconds between market data messages

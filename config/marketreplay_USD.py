@@ -148,7 +148,7 @@ starting_cash = 10000000  # Cash in this simulator is always in RUB.
 
 stream_history_length = 25000
 
-agents.extend([ExchangeAgent(id=0,
+agents.extend([ExchangeAgent(agent_id=0,
                              name="EXCHANGE_AGENT",
                              type="ExchangeAgent",
                              mkt_open=mkt_open,
@@ -204,14 +204,8 @@ agent_types.extend("MomentumAgent")
 
 #5.1) imbalance agent
 num_obi_agents = 1
-agents.extend([OrderBookImbalanceAgent(id=j,
-                                        entry_threshold=0.2,
-                                       name="OBI_AGENT_{}".format(j),
-                                       type="OrderBookImbalanceAgent",
-                                       symbol=symbol,
-                                       starting_cash=starting_cash,
-                                       log_orders=True,
-                                       freq=3600000000,
+agents.extend([OrderBookImbalanceAgent(agent_id=j, name="OBI_AGENT_{}".format(j), symbol=symbol, entry_threshold=0.2,
+                                       freq=3600000000, starting_cash=starting_cash, log_orders=True,
                                        random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32,
                                                                                                  dtype='uint64')))
                for j in range(agent_count, agent_count + num_obi_agents)])

@@ -16,7 +16,7 @@ class SimpleAgent(TradingAgent):
                  min_size, max_size, wake_up_freq='60s',
                  log_orders=False, random_state=None):
 
-        super().__init__(id, name, type, starting_cash=starting_cash, log_orders=log_orders, random_state=random_state)
+        super().__init__(id, name, random_state=random_state, starting_cash=starting_cash, log_orders=log_orders)
         self.symbol = symbol
         self.min_size = min_size  # Minimum order size
         self.max_size = max_size  # Maximum order size

@@ -1,17 +1,17 @@
-### The MeanRevertingOracle requires three parameters: a mean fundamental value,
-### a mean reversion coefficient, and a shock variance.  It constructs and retains
-### a fundamental value time series for each requested symbol, and provides noisy
-### observations of those values upon agent request.  The expectation is that
-### agents using such an oracle will know the mean-reverting equation and all
-### relevant parameters, but will not know the random shocks applied to the
-### sequence at each time step.
+# The MeanRevertingOracle requires three parameters: a mean fundamental value,
+# a mean reversion coefficient, and a shock variance.  It constructs and retains
+# a fundamental value time series for each requested symbol, and provides noisy
+# observations of those values upon agent request.  The expectation is that
+# agents using such an oracle will know the mean-reverting equation and all
+# relevant parameters, but will not know the random shocks applied to the
+# sequence at each time step.
 
-### Historical dates are effectively meaningless to this oracle.  It is driven by
-### the numpy random number seed contained within the experimental config file.
-### This oracle uses the nanoseconds portion of the current simulation time as
-### discrete "time steps".  A suggestion: to keep wallclock runtime reasonable,
-### have the agents operate for only ~1000 nanoseconds, but interpret nanoseconds
-### as seconds or minutes.
+# Historical dates are effectively meaningless to this oracle.  It is driven by
+# the numpy random number seed contained within the experimental config file.
+# This oracle uses the nanoseconds portion of the current simulation time as
+# discrete "time steps".  A suggestion: to keep wallclock runtime reasonable,
+# have the agents operate for only ~1000 nanoseconds, but interpret nanoseconds
+# as seconds or minutes.
 
 import datetime as dt
 from math import sqrt
@@ -19,10 +19,17 @@ from math import sqrt
 import numpy as np
 import pandas as pd
 
+from oracle import Oracle
 from util import log_print
 
 
-class MeanRevertingOracle:
+class MeanRevertingOracle(Oracle):
+    __slots__ = (
+        "mkt_open",
+        "mkt_close",
+        "symbols",
+        "r"
+    )
 
     def __init__(self, mkt_open, mkt_close, symbols):
         # Symbols must be a dictionary of dictionaries with outer keys as symbol names and
@@ -78,7 +85,7 @@ class MeanRevertingOracle:
         s[:] = np.round(r)
         s = s.astype(int)
 
-        return (s)
+        return s
 
     # Return the daily open price for the symbol given.  In the case of the MeanRevertingOracle,
     # this will simply be the first fundamental value, which is also the fundamental mean.
@@ -107,12 +114,12 @@ class MeanRevertingOracle:
     # Each agent must pass its RandomState object to observePrice.  This ensures that
     # each agent will receive the same answers across multiple same-seed simulations
     # even if a new agent has been added to the experiment.
-    def observePrice(self, symbol, currentTime, sigma_n=1000, random_state=None):
+    def observePrice(self, symbol, current_time, sigma_n=1000, random_state=None):
         # If the request is made after market close, return the close price.
-        if currentTime >= self.mkt_close:
+        if current_time >= self.mkt_close:
             r_t = self.r[symbol].loc[self.mkt_close - pd.Timedelta('1ns')]
         else:
-            r_t = self.r[symbol].loc[currentTime]
+            r_t = self.r[symbol].loc[current_time]
 
         # Generate a noisy observation of fundamental value at the current time.
         if sigma_n == 0:
@@ -120,7 +127,7 @@ class MeanRevertingOracle:
         else:
             obs = int(round(random_state.normal(loc=r_t, scale=sqrt(sigma_n))))
 
-        log_print("Oracle: current fundamental value is {} at {}", r_t, currentTime)
+        log_print("Oracle: current fundamental value is {} at {}", r_t, current_time)
         log_print("Oracle: giving client value observation {}", obs)
 
         # Reminder: all simulator prices are specified in integer cents.

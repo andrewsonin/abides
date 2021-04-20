@@ -19,7 +19,7 @@ class POVMarketMakerAgent(TradingAgent):
                  num_ticks=20, wake_up_freq='1s', subscribe=False, subscribe_freq=10e9, subscribe_num_levels=1,
                  log_orders=False, random_state=None):
 
-        super().__init__(id, name, type, starting_cash=starting_cash, log_orders=log_orders, random_state=random_state)
+        super().__init__(id, name, random_state=random_state, starting_cash=starting_cash, log_orders=log_orders)
         self.symbol = symbol      # Symbol traded
         self.pov = pov  # fraction of transacted volume placed at each price level
         self.min_order_size = min_order_size  # minimum size order to place at each level, if pov <= min

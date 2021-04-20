@@ -11,7 +11,7 @@ class ImpactAgent(TradingAgent):
                  impact=True, impact_time=None, impact_duration=0, impact_trades=0,
                  impact_vol=None, random_state=None):
         # Base class init.
-        super().__init__(id, name, type, starting_cash=starting_cash, random_state=random_state)
+        super().__init__(id, name, random_state=random_state, starting_cash=starting_cash)
 
         self.symbol = symbol  # symbol to trade
         self.trading = False  # ready to trade

@@ -12,8 +12,8 @@ class ValueAgent(TradingAgent):
                  lambda_a=0.005, log_orders=False, log_to_file=True, random_state=None):
 
         # Base class init.
-        super().__init__(id, name, type, starting_cash=starting_cash,
-                         log_orders=log_orders, log_to_file=log_to_file, random_state=random_state)
+        super().__init__(id, name, random_state=random_state, starting_cash=starting_cash, log_orders=log_orders,
+                         log_to_file=log_to_file)
 
         # Store important parameters particular to the ZI agent.
         self.symbol = symbol  # symbol to trade
@@ -39,7 +39,7 @@ class ValueAgent(TradingAgent):
         # units have passed.
         self.prev_wake_time = None
 
-        self.percent_aggr = 0.1  # percent of time that the agent will aggress the spread
+        self.percent_aggr = 0.1  # percent of time that the agent will address the spread
         self.size = np.random.randint(20, 50)  # size that the agent will be placing
         self.depth_spread = 2
 

@@ -15,7 +15,7 @@ class AgentLatencyModelBase(ABC):
 class DefaultAgentLatencyModel(AgentLatencyModelBase):
     __slots__ = ("default_latency",)
 
-    def __init__(self, default_latency: int):
+    def __init__(self, default_latency: int) -> None:
         self.default_latency = default_latency
 
     def get_latency_and_noise(self, sender_id: int, recipient_id: int) -> Tuple[int, int]:
@@ -28,7 +28,7 @@ class AgentLatencyModel(AgentLatencyModelBase):
     def __init__(self,
                  latency_matrix: Sequence[Sequence[int]],
                  noise_probs: Sequence[float],
-                 random_state: np.random.RandomState):
+                 random_state: np.random.RandomState) -> None:
         """
         :param latency_matrix:  Defines the communication delay between every pair of agents.
                                 The first dimension refers to the sender ID, the second — to the recipient one
@@ -40,7 +40,7 @@ class AgentLatencyModel(AgentLatencyModelBase):
             raise ValueError("Parameter 'noise_probs' should define the array of probabilities that add up to 1")
         self.latency_matrix = latency_matrix
         # There is a noise model for latency, intended to be a one-sided
-        # distribution with the peak at zero.  By default there is no noise
+        # distribution with the peak at zero. By default there is no noise
         # (100% chance to add zero ns extra delay).
         self.noise_probs = noise_probs
         self.random_state = random_state

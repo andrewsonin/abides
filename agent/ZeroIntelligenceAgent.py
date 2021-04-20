@@ -15,7 +15,7 @@ class ZeroIntelligenceAgent(TradingAgent):
                  lambda_a=0.005, log_orders=False, random_state=None):
 
         # Base class init.
-        super().__init__(id, name, type, starting_cash=starting_cash, log_orders=log_orders, random_state=random_state)
+        super().__init__(id, name, random_state=random_state, starting_cash=starting_cash, log_orders=log_orders)
 
         # Store important parameters particular to the ZI agent.
         self.symbol = symbol  # symbol to trade

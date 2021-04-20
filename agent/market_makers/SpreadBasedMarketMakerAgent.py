@@ -18,7 +18,7 @@ class SpreadBasedMarketMakerAgent(TradingAgent):
                  num_ticks=20, wake_up_freq='1s', subscribe=True, subscribe_freq=10e9, subscribe_num_levels=1,
                  log_orders=False, random_state=None):
 
-        super().__init__(id, name, type, starting_cash=starting_cash, log_orders=log_orders, random_state=random_state)
+        super().__init__(id, name, random_state=random_state, starting_cash=starting_cash, log_orders=log_orders)
         self.symbol = symbol      # Symbol traded
         self.order_size = order_size  # order size per price level
         self.window_size = window_size  # Size in ticks (cents) of how wide the window around mid price is

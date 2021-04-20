@@ -8,6 +8,7 @@ from typing import Tuple, List, Dict, Sequence, Union, Optional, Any, Generic, T
 import numpy as np
 import pandas as pd
 
+from abides._typing import KernelSummaryLogEntry, AgentEventLogEntry, Event, KernelCustomState
 from latency import AgentLatencyModelBase, DefaultAgentLatencyModel, AgentLatencyModel
 from message import MessageAbstractBase, Message, WakeUp
 from util import log_print
@@ -21,7 +22,6 @@ _one_ns_timedelta = pd.Timedelta(1)
 _one_s_timedelta = np.timedelta64(1, 's')
 
 _OracleType = TypeVar('_OracleType')
-_CustomState = Dict[str, Any]
 
 
 class Kernel(Generic[_OracleType]):
@@ -90,7 +90,7 @@ class Kernel(Generic[_OracleType]):
         # by separate statistical summary programs. Detailed event
         # logging should go only to the agent's individual log. This
         # is for things like "final position value" and such.
-        self.summary_log: List[Dict[str, Any]] = []
+        self.summary_log: List[KernelSummaryLogEntry] = []
 
         # agents must be a list of agents for the simulation,
         #        based on class agent.Agent
@@ -109,10 +109,10 @@ class Kernel(Generic[_OracleType]):
         self.stop_time = stop_time
 
         # The kernel maintains a current time for each agent to allow
-        # simulation of per-agent computation delays.  The agent's time
+        # simulation of per-agent computation delays. The agent's time
         # is pushed forward (see below) each time it awakens, and it
         # cannot receive new messages/wakeups until the global time
-        # reaches the agent's time.  (i.e. it cannot act again while
+        # reaches the agent's time. (i.e. it cannot act again while
         # it is still "in the future")
 
         # This also nicely enforces agents being unable to act before
@@ -121,8 +121,8 @@ class Kernel(Generic[_OracleType]):
 
         # agentComputationDelays is in nanoseconds, starts with a default
         # value from config, and can be changed by any agent at any time
-        # (for itself only).  It represents the time penalty applied to
-        # an agent each time it is awakened  (wakeup or recvMsg).  The
+        # (for itself only). It represents the time penalty applied to
+        # an agent each time it is awakened  (wakeup or recvMsg). The
         # penalty applies _after_ the agent acts, before it may act again.
         # TODO: this might someday change to pd.Timedelta objects.
         if not isinstance(default_computation_delay, int):
@@ -143,22 +143,22 @@ class Kernel(Generic[_OracleType]):
             raise TypeError("Parameter 'agent_latency_model' should be an instance of 'AgentLatencyModelBase' or None")
 
         # The kernel maintains an accumulating additional delay parameter
-        # for the current agent.  This is applied to each message sent
+        # for the current agent. This is applied to each message sent
         # and upon return from wakeup/receiveMessage, in addition to the
-        # agent's standard computation delay.  However, it never carries
-        # over to future wakeup/receiveMessage calls.  It is useful for
+        # agent's standard computation delay. However, it never carries
+        # over to future wakeup/receiveMessage calls. It is useful for
         # staggering of sent messages.
         self.current_agent_additional_delay = 0
 
         # If a log directory was not specified, use the initial wallclock.
         self.log_dir: Union[str, PathLike, Path] = log_dir or str(int(self.kernel_wallclock_start.timestamp()))
 
-        # Simulation custom state in a freeform dictionary.  Allows config files
+        # Simulation custom state in a freeform dictionary. Allows config files
         # that drive multiple simulations, or require the ability to generate
         # special logs after simulation, to obtain needed output without special
-        # case code in the Kernel.  Per-agent state should be handled using the
+        # case code in the Kernel. Per-agent state should be handled using the
         # provided updateAgentState() method.
-        self.custom_state: _CustomState = {}
+        self.custom_state: KernelCustomState = {}
 
         # Should the Kernel skip writing agent logs?
         if not isinstance(skip_log, bool):
@@ -172,7 +172,7 @@ class Kernel(Generic[_OracleType]):
 
     # This is called to actually start the simulation, once all agent
     # configuration is done.
-    def runner(self, num_simulations: int = 1) -> _CustomState:
+    def runner(self, num_simulations: int = 1) -> KernelCustomState:
 
         agents = self.agents
         message_queue = self.message_queue
@@ -187,13 +187,13 @@ class Kernel(Generic[_OracleType]):
         log_print(f"Kernel started: {self.name}\nSimulation started!")
 
         # Note that num_simulations has not yet been really used or tested
-        # for anything.  Instead we have been running multiple simulations
+        # for anything. Instead we have been running multiple simulations
         # with coarse parallelization from a shell script.
         for sim in range(num_simulations):
             log_print(f"Starting sim {sim}")
 
             # Event notification for kernel init (agents should not try to
-            # communicate with other agents, as order is unknown).  Agents
+            # communicate with other agents, as order is unknown). Agents
             # should initialize any internal resources that may be needed
             # to communicate with other agents during agent.kernelStarting().
             # Kernel passes self-reference for agents to retain, so they can
@@ -205,16 +205,16 @@ class Kernel(Generic[_OracleType]):
 
             # Event notification for kernel start (agents may set up
             # communications or references to other agents, as all agents
-            # are guaranteed to exist now).  Agents should obtain references
+            # are guaranteed to exist now). Agents should obtain references
             # to other agents they require for proper operation (exchanges,
-            # brokers, subscription services...).  Note that we generally
+            # brokers, subscription services...). Note that we generally
             # don't (and shouldn't) permit agents to get direct references
             # to other agents (like the exchange) as they could then bypass
             # the Kernel, and therefore simulation "physics" to send messages
             # directly and instantly or to perform disallowed direct inspection
-            # of the other agent's state.  Agents should instead obtain the
+            # of the other agent's state. Agents should instead obtain the
             # agent ID of other agents, and communicate with them only via
-            # the Kernel.  Direct references to utility objects that are not
+            # the Kernel. Direct references to utility objects that are not
             # agents are acceptable (e.g. oracles).
             log_print("\n--- Agent.kernelStarting() ---")
             for agent in agents:
@@ -248,8 +248,7 @@ class Kernel(Generic[_OracleType]):
                         f"wallclock elapsed: {pd.Timestamp('now') - eventQueueWallClockStart} ---\n"
                     )
 
-                msg_class = msg.__class__
-                msg_class_name = msg_class.__name__
+                msg_class_name = msg.__class__.__name__
                 log_print(
                     "\n--- Kernel Event Queue pop ---\n"
                     f"Kernel handling {msg_class_name} message for agent {agent_id} "
@@ -261,7 +260,7 @@ class Kernel(Generic[_OracleType]):
                 # In between messages, always reset the currentAgentAdditionalDelay.
                 self.current_agent_additional_delay = 0
 
-                # Test to see if the agent is already in the future.  If so,
+                # Test to see if the agent is already in the future. If so,
                 # delay the wakeup until the agent can act again.
                 agent_current_time = agent_current_times[agent_id]
                 if agent_current_time > self.current_time:
@@ -276,10 +275,10 @@ class Kernel(Generic[_OracleType]):
                 # of processing.
                 agent_current_times[agent_id] = self.current_time
 
-                if msg_class is Message:
+                if isinstance(msg, Message):
                     agents[agent_id].receiveMessage(self.current_time, msg)
                     called_method_name = "receiveMessage"
-                elif msg_class is WakeUp:
+                elif isinstance(msg, WakeUp):
                     agents[agent_id].wakeup(self.current_time)
                     called_method_name = "wakeup"
                 else:
@@ -320,7 +319,7 @@ class Kernel(Generic[_OracleType]):
 
             # Event notification for kernel termination (agents should not
             # attempt communication with other agents, as order of termination
-            # is unknown).  Agents should clean up all used resources as the
+            # is unknown). Agents should clean up all used resources as the
             # simulation program may not actually terminate if num_simulations > 1.
             log_print("\n--- Agent.kernelTerminating() ---")
             for agent in agents:
@@ -372,11 +371,11 @@ class Kernel(Generic[_OracleType]):
         # Apply the agent's current computation delay to effectively "send" the message
         # at the END of the agent's current computation period when it is done "thinking".
         # NOTE: sending multiple messages on a single wake will transmit all at the same
-        # time, at the end of computation.  To avoid this, use Agent.delay() to accumulate
+        # time, at the end of computation. To avoid this, use Agent.delay() to accumulate
         # a temporary delay (current cycle only) that will also stagger messages.
 
         # The optional pipeline delay parameter DOES push the send time forward, since it
-        # represents "thinking" time before the message would be sent.  We don't use this
+        # represents "thinking" time before the message would be sent. We don't use this
         # for much yet, but it could be important later.
 
         # This means message delay (before latency) is the agent's standard computation delay
@@ -411,8 +410,8 @@ class Kernel(Generic[_OracleType]):
 
     def setWakeup(self, sender_id: int, requested_time: Optional[pd.Timestamp] = None) -> None:
         # Called by an agent to receive a "wakeup call" from the kernel
-        # at some requested future time.  Defaults to the next possible
-        # timestamp.  Wakeup time cannot be the current time or a past time.
+        # at some requested future time. Defaults to the next possible
+        # timestamp. Wakeup time cannot be the current time or a past time.
         # Sender is required and should be the ID of the agent making the call.
         # The agent is responsible for maintaining any required state; the
         # kernel will not supply any parameters to the wakeup() call.
@@ -441,9 +440,9 @@ class Kernel(Generic[_OracleType]):
     def setAgentComputeDelay(self, sender_id: int, requested_delay: int) -> None:
         # Called by an agent to update its computation delay.  This does
         # not initiate a global delay, nor an immediate delay for the
-        # agent.  Rather it sets the new default delay for the calling
-        # agent.  The delay will be applied upon every return from wakeup
-        # or recvMsg.  Note that this delay IS applied to any messages
+        # agent. Rather it sets the new default delay for the calling
+        # agent. The delay will be applied upon every return from wakeup
+        # or recvMsg. Note that this delay IS applied to any messages
         # sent by the agent during the current wake cycle (simulating the
         # messages popping out at the end of its "thinking" time).
 
@@ -471,8 +470,8 @@ class Kernel(Generic[_OracleType]):
     def delayAgent(self, additional_delay: int) -> None:
         # Called by an agent to accumulate temporary delay for the current wake cycle.
         # This will apply the total delay (at time of sendMessage) to each message,
-        # and will modify the agent's next available time slot.  These happen on top
-        # of the agent's compute delay BUT DO NOT ALTER IT.  (i.e. effects are transient)
+        # and will modify the agent's next available time slot. These happen on top
+        # of the agent's compute delay BUT DO NOT ALTER IT. (i.e. effects are transient)
         # Mostly useful for staggering outbound messages.
 
         # additionalDelay should be in whole nanoseconds.
@@ -495,7 +494,7 @@ class Kernel(Generic[_OracleType]):
 
     def findAgentByType(self, agent_type: Type['Agent']) -> Optional[int]:
         # Called to request an arbitrary agent ID that matches the class or base class
-        # passed as "type".  For example, any ExchangeAgent, or any NasdaqExchangeAgent.
+        # passed as "type". For example, any ExchangeAgent, or any NasdaqExchangeAgent.
         # This method is rather expensive, so the results should be cached by the caller!
 
         for agent in self.agents:
@@ -509,17 +508,17 @@ class Kernel(Generic[_OracleType]):
                  filename: Optional[Union[str, PathLike, Path]] = None) -> None:
         # Called by any agent, usually at the very end of the simulation just before
         # kernel shutdown, to write to disk any log dataframe it has been accumulating
-        # during simulation.  The format can be decided by the agent, although changes
-        # will require a special tool to read and parse the logs.  The Kernel places
+        # during simulation. The format can be decided by the agent, although changes
+        # will require a special tool to read and parse the logs. The Kernel places
         # the log in a unique directory per run, with one filename per agent, also
         # decided by the Kernel using agent type, id, etc.
 
         # If there are too many agents, placing all these files in a directory might
-        # be unfortunate.  Also if there are too many agents, or if the logs are too
-        # large, memory could become an issue.  In this case, we might have to take
+        # be unfortunate. Also if there are too many agents, or if the logs are too
+        # large, memory could become an issue. In this case, we might have to take
         # a speed hit to write logs incrementally.
 
-        # If filename is not None, it will be used as the filename.  Otherwise,
+        # If filename is not None, it will be used as the filename. Otherwise,
         # the Kernel will construct a filename based on the name of the Agent
         # requesting log archival.
 
@@ -532,7 +531,7 @@ class Kernel(Generic[_OracleType]):
         makedirs(path, exist_ok=True)
         log_df.to_pickle(joinpath(path, file), compression='bz2')
 
-    def appendSummaryLog(self, sender_id: int, event_type: str, event: Any) -> None:
+    def appendSummaryLog(self, sender_id: int, event_type: str, event: Event) -> None:
         # We don't even include a timestamp, because this log is for one-time-only
         # summary reporting, like starting cash, or ending cash.
         self.summary_log.append(
@@ -553,21 +552,23 @@ class Kernel(Generic[_OracleType]):
         dfLog.to_pickle(joinpath(path, file), compression='bz2')
 
     def updateAgentState(self, agent_id: int, state: Any) -> None:
-        """ Called by an agent that wishes to replace its custom state in the dictionary
-            the Kernel will return at the end of simulation.  Shared state must be set directly,
-            and agents should coordinate that non-destructively.
+        """Called by an agent that wishes to replace its custom state in the dictionary
+           the Kernel will return at the end of simulation. Shared state must be set directly,
+           and agents should coordinate that non-destructively.
 
-            Note that it is never necessary to use this kernel state dictionary for an agent
-            to remember information about itself, only to report it back to the config file.
+           Note that it is never necessary to use this kernel state dictionary for an agent
+           to remember information about itself, only to report it back to the config file.
         """
-        if 'agent_state' not in self.custom_state:
-            self.custom_state['agent_state'] = {}
-        self.custom_state['agent_state'][agent_id] = state
+        custom_state = self.custom_state
+        if 'agent_state' in custom_state:
+            custom_state['agent_state'][agent_id] = state
+        else:
+            custom_state['agent_state'] = {agent_id: state}
 
     @staticmethod
     def fmtTime(simulation_time: pd.Timestamp) -> pd.Timestamp:
-        # The Kernel class knows how to pretty-print time.  It is assumed simulationTime
-        # is in nanoseconds since midnight.  Note this is a static method which can be
+        # The Kernel class knows how to pretty-print time. It is assumed simulationTime
+        # is in nanoseconds since midnight. Note this is a static method which can be
         # called either on the class or an instance.
 
         # Try just returning the pd.Timestamp now.
@@ -598,7 +599,6 @@ class Agent:
     def __init__(self,
                  agent_id: int,
                  name: str,
-                 agent_type: str,
                  random_state: np.random.RandomState,
                  log_to_file: bool = True) -> None:
 
@@ -622,23 +622,23 @@ class Agent:
         # Kernel is supplied via kernelInitializing method of kernel lifecycle.
         self.kernel: Kernel = None  # type: ignore
 
-        # What time does the agent think it is?  Should be updated each time
+        # What time does the agent think it is? Should be updated each time
         # the agent wakes via wakeup or receiveMessage. (For convenience
         # of reference throughout the Agent class hierarchy, NOT THE
         # CANONICAL TIME.)
         self.current_time: pd.Timestamp = None  # type: ignore
 
-        # Agents may choose to maintain a log.  During simulation,
-        # it should be stored as a list of dictionaries.  The expected
-        # keys by default are: EventTime, EventType, Event.  Other
+        # Agents may choose to maintain a log. During simulation,
+        # it should be stored as a list of dictionaries. The expected
+        # keys by default are: EventTime, EventType, Event. Other
         # Columns may be added, but will then require specializing
-        # parsing and will increase output dataframe size.  If there
+        # parsing and will increase output dataframe size. If there
         # is a non-empty log, it will be written to disk as a Dataframe
         # at kernel termination.
 
         # It might, or might not, make sense to formalize these log Events
         # as a class, with enumerated EventTypes and so forth.
-        self.log: List[Dict[str, Any]] = []
+        self.log: List[AgentEventLogEntry] = []
         self.logEvent("AGENT_TYPE", self.type)
 
     @classmethod
@@ -690,9 +690,8 @@ class Agent:
             self.writeLog(dfLog)
 
     # >>> Methods for internal use by agents (e.g. bookkeeping) >>>
-
-    def logEvent(self, event_type: str, event: Any = '', append_summary_log: bool = False) -> None:
-        # Adds an event to this agent's log.  The deepcopy of the Event field,
+    def logEvent(self, event_type: str, event: Event = '', append_summary_log: bool = False) -> None:
+        # Adds an event to this agent's log. The deepcopy of the Event field,
         # often an object, ensures later state changes to the object will not
         # retroactively update the logged event.
 
@@ -715,21 +714,20 @@ class Agent:
     # The kernel will _not_ call these methods on its own behalf,
     # only to pass traffic from other agents..
 
-    def receiveMessage(self, current_time: pd.Timestamp, msg: MessageAbstractBase) -> None:
+    def receiveMessage(self, current_time: pd.Timestamp, msg: Message) -> None:
         # Called each time a message destined for this agent reaches
-        # the front of the kernel's priority queue.  currentTime is
+        # the front of the kernel's priority queue. currentTime is
         # the simulation time at which the kernel is delivering this
-        # message -- the agent should treat this as "now".  msg is
+        # message -- the agent should treat this as "now". msg is
         # an object guaranteed to inherit from the message.Message class.
 
-        self.current_time = current_time
         log_print(
-            f"At {self.kernel.fmtTime(current_time)}, agent {self.id} ({self.name}) received: {msg}"
+            f"At {self.kernel.fmtTime(self.current_time)}, agent {self.id} ({self.name}) received: {msg}"
         )
 
     def wakeup(self, current_time: pd.Timestamp) -> None:
         # Agents can request a wakeup call at a future simulation time using
-        # Agent.setWakeup().  This is the method called when the wakeup time
+        # Agent.setWakeup(). This is the method called when the wakeup time
         # arrives.
 
         self.current_time = current_time
@@ -737,11 +735,11 @@ class Agent:
             f"At {self.kernel.fmtTime(current_time)}, agent {self.id} ({self.name}) received wakeup."
         )
 
-    # Methods used to request services from the Kernel.  These should be used
-    # by all agents.  Kernel methods should _not_ be called directly!
+    # Methods used to request services from the Kernel. These should be used
+    # by all agents. Kernel methods should _not_ be called directly!
 
     # Presently the kernel expects agent IDs only, not agent references.
-    # It is possible this could change in the future.  Normal agents will
+    # It is possible this could change in the future. Normal agents will
     # not typically wish to request additional delay.
     def sendMessage(self, recipient_id: int, msg: MessageAbstractBase, delay: int = 0) -> None:
         self.kernel.sendMessage(self.id, recipient_id, msg, delay)
@@ -762,10 +760,11 @@ class Agent:
         self.kernel.writeLog(self.id, df_log, filename)
 
     def updateAgentState(self, state: Any) -> None:
-        """ Agents should use this method to replace their custom state in the dictionary
-            the Kernel will return to the experimental config file at the end of the
-            simulation.  This is intended to be write-only, and agents should not use
-            it to store information for their own later use.
+        """
+        Agents should use this method to replace their custom state in the dictionary
+        the Kernel will return to the experimental config file at the end of the
+        simulation. This is intended to be write-only, and agents should not use
+        it to store information for their own later use.
         """
         self.kernel.updateAgentState(self.id, state)
 
