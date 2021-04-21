@@ -9,7 +9,7 @@ from scipy.sparse import dok_matrix
 from tqdm import tqdm
 
 from message import Message
-from order.LimitOrder import LimitOrder
+from order import LimitOrder
 from util import log_print, be_silent
 
 

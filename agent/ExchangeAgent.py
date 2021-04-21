@@ -198,49 +198,55 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
         self.setComputationDelay(self.computation_delay)
 
         sender_id = msg.sender_id
+        msg_type = msg.type
         mkt_closed = current_time > self.mkt_close
         # Is the exchange closed?  (This block only affects post-close, not pre-open.)
         if isinstance(msg, OrderRequest):
             if mkt_closed:
-                log_print(f"{self.name} received {msg.type}: {msg.order}")
-                self.sendMessage(msg.sender_id, MarketClosedReply(self.id))
+                log_print(f"{self.name} received {msg_type}: {msg.order}")
+                self.sendMessage(sender_id, MarketClosedReply(self.id))
                 return
             if self.log_orders:
-                self.logEvent(msg.type, msg.order.to_dict())
+                self.logEvent(msg_type, msg.order.to_dict())
 
             if isinstance(msg, LimitOrderRequest):
-                self.__LimitOrderRequest(msg)
+                self.processLimitOrderRequest(msg)
             elif isinstance(msg, MarketOrderRequest):
-                self.__MarketOrderRequest(msg)
+                self.processMarketOrderRequest(msg)
             elif isinstance(msg, CancelOrderRequest):
-                self.__CancelOrderRequest(msg)
+                self.processCancelOrderRequest(msg)
             elif isinstance(msg, ModifyOrderRequest):
-                self.__ModifyOrderRequest(msg)
+                self.processModifyOrderRequest(msg)
+            else:
+                log_print(f"{self.name} received OrderRequest of type {msg_type}, but not handled")
 
         elif isinstance(msg, Query):
             if mkt_closed:
-                log_print(f"{self.name} received {msg.type}, discarded: market is closed.")
-                self.sendMessage(msg.sender_id, MarketClosedReply(self.id))
+                log_print(f"{self.name} received {msg_type}, discarded: market is closed.")
+                self.sendMessage(sender_id, MarketClosedReply(self.id))
                 # Don't do any further processing on these messages!
                 return
-            self.logEvent(msg.type, sender_id)
+            self.logEvent(msg_type, sender_id)
 
             if isinstance(msg, QueryLastTrade):
-                self.__QueryLastTrade(msg, sender_id, mkt_closed)
+                self.processQueryLastTrade(msg, mkt_closed)
             elif isinstance(msg, QuerySpread):
-                self.__QuerySpread(msg, sender_id, mkt_closed)
+                self.processQuerySpread(msg, mkt_closed)
             elif isinstance(msg, QueryOrderStream):
-                self.__QueryOrderStream(msg, sender_id, mkt_closed)
+                self.processQueryOrderStream(msg, mkt_closed)
             elif isinstance(msg, QueryTransactedVolume):
-                self.__QueryTransactedVolume(msg, sender_id, mkt_closed)
-        else:
-            self.logEvent(msg.type, sender_id)
-            if isinstance(msg, MarketDataSubscription):
-                self.__MarketDataSubscriptionMessage(msg, sender_id, current_time)
-            elif isinstance(msg, MarketOpeningHourRequest):
-                self.__MarketOpeningHourRequest(msg, sender_id)
+                self.processQueryTransactedVolume(msg, mkt_closed)
             else:
-                log_print(f"{self.name} received {msg.type}, but not handled")
+                log_print(f"{self.name} received Query of type {msg_type}, but not handled")
+
+        else:
+            self.logEvent(msg_type, sender_id)
+            if isinstance(msg, MarketDataSubscription):
+                self.processMarketDataSubscriptionMessage(msg, current_time)
+            elif isinstance(msg, MarketOpeningHourRequest):
+                self.processMarketOpeningHourRequest(msg)
+            else:
+                log_print(f"{self.name} received {msg_type}, but not handled")
 
     def updateSubscriptionDict(self, msg: MarketDataSubscription, current_time: pd.Timestamp) -> None:
         # The subscription dict is a dictionary with the key = agent ID,
@@ -386,7 +392,7 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
                 self.logEvent(msg.type, msg.order.to_dict())
         else:
             # Other message types incur only the currently-configured computation delay for this agent.
-            super().sendMessage(recipient_id, msg)
+            super().sendMessage(recipient_id, msg, delay)
 
     # Simple accessor methods for the market open and close times.
     def getMarketOpen(self) -> pd.Timestamp:
@@ -395,7 +401,7 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
     def getMarketClose(self) -> pd.Timestamp:
         return self.mkt_close
 
-    def __LimitOrderRequest(self, msg: LimitOrderRequest) -> None:
+    def processLimitOrderRequest(self, msg: LimitOrderRequest) -> None:
         order = msg.order
         symbol = order.symbol
         log_print(f"{self.name} received LIMIT_ORDER: {order}")
@@ -406,7 +412,7 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
             self.order_books[symbol].handleLimitOrder(deepcopy(order))
             self.publishOrderBookData()
 
-    def __MarketOrderRequest(self, msg: MarketOrderRequest) -> None:
+    def processMarketOrderRequest(self, msg: MarketOrderRequest) -> None:
         order = msg.order
         symbol = order.symbol
         log_print(f"{self.name} received MARKET_ORDER: {order}")
@@ -417,7 +423,7 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
             self.order_books[symbol].handleMarketOrder(deepcopy(order))
             self.publishOrderBookData()
 
-    def __CancelOrderRequest(self, msg: CancelOrderRequest) -> None:
+    def processCancelOrderRequest(self, msg: CancelOrderRequest) -> None:
         # Note: this is somewhat open to abuse, as in theory agents could cancel other agents' orders.
         # An agent could also become confused if they receive a (partial) execution on an order they
         # then successfully cancel, but receive the cancel confirmation first. Things to think about
@@ -432,7 +438,7 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
             self.order_books[symbol].cancelOrder(deepcopy(order))
             self.publishOrderBookData()
 
-    def __ModifyOrderRequest(self, msg: ModifyOrderRequest) -> None:
+    def processModifyOrderRequest(self, msg: ModifyOrderRequest) -> None:
         # Replace an existing order with a modified order. There could be some timing issues
         # here. What if an order is partially executed, but the submitting agent has not
         # yet received the notification, and submits a modification to the quantity of the
@@ -449,8 +455,9 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
             self.order_books[symbol].modifyOrder(deepcopy(order), deepcopy(new_order))
             self.publishOrderBookData()
 
-    def __QueryLastTrade(self, msg: QueryLastTrade, sender_id: int, mkt_closed: bool) -> None:
+    def processQueryLastTrade(self, msg: QueryLastTrade, mkt_closed: bool) -> None:
         symbol = msg.symbol
+        sender_id = msg.sender_id
         if symbol not in self.order_books:
             log_print(f"Last trade request discarded. Unknown symbol: {symbol}")
         else:
@@ -468,9 +475,10 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
                 )
             )
 
-    def __QuerySpread(self, msg: QuerySpread, sender_id: int, mkt_closed: bool) -> None:
+    def processQuerySpread(self, msg: QuerySpread, mkt_closed: bool) -> None:
         symbol = msg.symbol
         depth = msg.depth
+        sender_id = msg.sender_id
         if symbol not in self.order_books:
             log_print(f"Bid-ask spread request discarded. Unknown symbol: {symbol}")
         else:
@@ -493,9 +501,10 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
                 )
             )
 
-    def __QueryOrderStream(self, msg: QueryOrderStream, sender_id: int, mkt_closed: bool) -> None:
+    def processQueryOrderStream(self, msg: QueryOrderStream, mkt_closed: bool) -> None:
         symbol = msg.symbol
         length = msg.length
+        sender_id = msg.sender_id
         if symbol not in self.order_books:
             log_print(f"Order stream request discarded. Unknown symbol: {symbol}")
         else:
@@ -514,9 +523,10 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
             )
         )
 
-    def __QueryTransactedVolume(self, msg: QueryTransactedVolume, sender_id: int, mkt_closed: bool) -> None:
+    def processQueryTransactedVolume(self, msg: QueryTransactedVolume, mkt_closed: bool) -> None:
         symbol = msg.symbol
         lookback_period = msg.lookback_period
+        sender_id = msg.sender_id
         if symbol not in self.order_books:
             log_print(f"Order stream request discarded. Unknown symbol: {symbol}")
         else:
@@ -533,14 +543,14 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
             )
         )
 
-    def __MarketDataSubscriptionMessage(self,
-                                        msg: MarketDataSubscription,
-                                        sender_id: int,
-                                        current_time: pd.Timestamp) -> None:
-        log_print(f"{self.name} received {msg.type} request from agent {sender_id}")
+    def processMarketDataSubscriptionMessage(self,
+                                             msg: MarketDataSubscription,
+                                             current_time: pd.Timestamp) -> None:
+        log_print(f"{self.name} received {msg.type} request from agent {msg.sender_id}")
         self.updateSubscriptionDict(msg, current_time)
 
-    def __MarketOpeningHourRequest(self, msg: MarketOpeningHourRequest, sender_id: int) -> None:
+    def processMarketOpeningHourRequest(self, msg: MarketOpeningHourRequest) -> None:
+        sender_id = msg.sender_id
         log_print(f"{self.name} received {msg.type} request from agent {sender_id}")
 
         # The exchange is permitted to respond to requests for simple immutable data (like "what are your

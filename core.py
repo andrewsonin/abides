@@ -769,6 +769,6 @@ class Agent:
         self.kernel.updateAgentState(self.id, state)
 
     # Internal methods that should not be modified without a very good reason.
-    def __lt__(self, other: 'Agent') -> bool:
-        # Required by Python3 for this object to be placed in a priority queue.
-        return f"{self.id}" < f"{other.id}"
+    # def __lt__(self, other: 'Agent') -> bool:
+    #     # Required by Python3 for this object to be placed in a priority queue.
+    #     return f"{self.id}" < f"{other.id}"

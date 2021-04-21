@@ -1,5 +1,6 @@
 import warnings
 from contextlib import contextmanager
+from typing import Type, Generator
 
 import numpy as np
 import pandas as pd
@@ -166,3 +167,11 @@ def sigmoid(x, beta):
         # zero because it's 1+z.
         z = np.exp(beta * x)
         return z / (1 + z)
+
+
+def get_defined_slots(cls: Type) -> Generator[str, None, None]:
+    return (
+        slot
+        for cls in reversed(cls.mro()[:-1])  # Get all parent classes except "object"
+        for slot in cls.__slots__
+    )

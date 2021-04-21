@@ -1,10 +1,10 @@
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 from typing import Sequence, Tuple
 
 import numpy as np
 
 
-class AgentLatencyModelBase(ABC):
+class AgentLatencyModelBase(metaclass=ABCMeta):
     __slots__ = ()
 
     @abstractmethod

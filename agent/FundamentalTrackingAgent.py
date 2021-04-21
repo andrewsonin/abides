@@ -10,7 +10,7 @@ from oracle import Oracle
 # >>> TYPING >>>
 class FundamentalInfo(TypedDict):
     FundamentalTime: int
-    FundamentalValue: float
+    FundamentalValue: int
 
 
 # <<< TYPING <<<

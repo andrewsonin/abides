@@ -4,7 +4,7 @@ import pickle
 import pandas as pd
 
 from agent.TradingAgent import TradingAgent
-from order.LimitOrder import LimitOrder
+from order import LimitOrder
 from util import log_print
 
 

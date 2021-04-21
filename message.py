@@ -1,9 +1,10 @@
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 from typing import Tuple, List
 
 import pandas as pd
 
-from order.Order import Order
+from order import Order
+from util import get_defined_slots
 
 __all__ = (
     "MessageAbstractBase",
@@ -49,7 +50,7 @@ __all__ = (
 )
 
 
-class MessageAbstractBase(ABC):
+class MessageAbstractBase(metaclass=ABCMeta):
     __slots__ = ("id",)
     _counter = 0
 
@@ -76,6 +77,8 @@ class MessageAbstractBase(ABC):
     def __lt__(self, other: 'MessageAbstractBase') -> bool:
         return (self.msg_type_priority, self.id) < (other.msg_type_priority, other.id)
 
+    get_defined_slots = classmethod(get_defined_slots)
+
     @property
     @abstractmethod
     def msg_type_priority(self) -> int:
@@ -97,12 +100,7 @@ class Message(MessageAbstractBase):
 
     def __str__(self) -> str:
         """Make a printable representation of the message"""
-        available_slots = {
-            slot
-            for cls in self.__class__.mro()[:-1]  # Get all parent classes except "object"
-            for slot in cls.__slots__
-        }
-        return f"{{{', '.join(f'{slot}: {getattr(self, slot)}' for slot in available_slots)}}}"
+        return f"{{{', '.join(f'{slot}: {getattr(self, slot)}' for slot in self.get_defined_slots())}}}"
 
     @property
     @abstractmethod
