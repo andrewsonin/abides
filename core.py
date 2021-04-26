@@ -690,7 +690,10 @@ class Agent:
             self.writeLog(dfLog)
 
     # >>> Methods for internal use by agents (e.g. bookkeeping) >>>
-    def logEvent(self, event_type: str, event: Event = '', append_summary_log: bool = False) -> None:
+    def logEvent(self,
+                 event_type: str,
+                 event: Event = '',
+                 append_summary_log: bool = False) -> None:
         # Adds an event to this agent's log. The deepcopy of the Event field,
         # often an object, ensures later state changes to the object will not
         # retroactively update the logged event.

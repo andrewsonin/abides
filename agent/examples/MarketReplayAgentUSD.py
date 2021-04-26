@@ -57,7 +57,7 @@ class MarketReplayAgentUSD(TradingAgent):
             elif existing_order and order['Size'] == 0:
                 self.cancelOrder(existing_order)
             elif existing_order and order['Size'] > 0:
-                # self.modifyOrder(existing_order, LimitOrder(self.id, currentTime, self.symbol, order['SIZE'],
+                # self.modifyLimitOrder(existing_order, LimitOrder(self.id, currentTime, self.symbol, order['SIZE'],
                 #                                             order['BUY_SELL_FLAG'] == 'BUY', order['PRICE'],
                 #                                             order_id=order_id))
                 self.modifyOrder(existing_order, LimitOrder(self.id, currentTime, self.symbol, order['Size'],

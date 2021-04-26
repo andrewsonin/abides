@@ -114,6 +114,8 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
 
         # The exchange maintains an order stream of all orders leading to the last L trades
         # to support certain agents from the auction literature (GD, HBL, etc).
+        if not isinstance(stream_history, int) or stream_history < 0:
+            raise TypeError("'stream_history' must be positive integer")
         self.stream_history = stream_history
 
         # Log all order activity?
@@ -435,7 +437,7 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
             log_print(f"Cancellation request discarded. Unknown symbol: {symbol}")
         else:
             # Hand the order to the order book for processing.
-            self.order_books[symbol].cancelOrder(deepcopy(order))
+            self.order_books[symbol].cancelLimitOrder(deepcopy(order))
             self.publishOrderBookData()
 
     def processModifyOrderRequest(self, msg: ModifyOrderRequest) -> None:
@@ -452,7 +454,7 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
         if order.symbol not in self.order_books:
             log_print(f"Modification request discarded. Unknown symbol: {symbol}")
         else:
-            self.order_books[symbol].modifyOrder(deepcopy(order), deepcopy(new_order))
+            self.order_books[symbol].modifyLimitOrder(deepcopy(order), deepcopy(new_order))
             self.publishOrderBookData()
 
     def processQueryLastTrade(self, msg: QueryLastTrade, mkt_closed: bool) -> None:

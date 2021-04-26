@@ -12,7 +12,11 @@ from util import get_defined_slots
 __all__ = (
     "Order",
     "MarketOrder",
+    "BuyMarket",
+    "SellMarket",
     "LimitOrder",
+    "Bid",
+    "Ask",
     "BasketOrder"
 )
 
@@ -30,7 +34,6 @@ class Order(metaclass=ABCMeta):
         "time_placed",
         "symbol",
         "quantity",
-        "is_buy_order",
         "order_id",
         "fill_price",
         "tag"
@@ -43,7 +46,6 @@ class Order(metaclass=ABCMeta):
                  time_placed: pd.Timestamp,
                  symbol: str,
                  quantity: int,
-                 is_buy_order: bool,
                  order_id: Optional[int] = None,
                  tag: Any = None) -> None:
 
@@ -57,9 +59,6 @@ class Order(metaclass=ABCMeta):
 
         # Number of equity units affected by the order.
         self.quantity = quantity
-
-        # Boolean: True indicates a buy order; False indicates a sell order.
-        self.is_buy_order = is_buy_order
 
         # Order ID: either self generated or assigned
         order_ids = Order._order_ids
@@ -111,6 +110,27 @@ class Order(metaclass=ABCMeta):
     def __repr__(self) -> str:
         pass
 
+    @property
+    @abstractmethod
+    def is_buy_order(self) -> bool:
+        pass
+
+
+class FilledOrder(Order):
+    __slots__ = ("fill_price",)
+
+    def __init__(self,
+                 agent_id: int,
+                 time_placed: pd.Timestamp,
+                 symbol: str,
+                 quantity: int,
+                 *,
+                 fill_price: int,
+                 order_id: Optional[int] = None,
+                 tag: Any = None) -> None:
+        super().__init__(agent_id, time_placed, symbol, quantity, order_id, tag)
+        self.fill_price = fill_price
+
 
 class MarketOrder(Order):
     __slots__ = ()
@@ -128,12 +148,11 @@ class MarketOrder(Order):
     __repr__ = __str__
 
     def __copy__(self) -> 'MarketOrder':
-        order = MarketOrder(
+        order = self.__class__(
             self.agent_id,
             self.time_placed,
             self.symbol,
             self.quantity,
-            self.is_buy_order,
             self.order_id,
             self.tag
         )
@@ -141,17 +160,26 @@ class MarketOrder(Order):
         return order
 
     def __deepcopy__(self, memo: Optional[Dict[int, Any]] = None) -> 'MarketOrder':
-        order = MarketOrder(
+        order = self.__class__(
             self.agent_id,
             self.time_placed,
             self.symbol,
             self.quantity,
-            self.is_buy_order,
             self.order_id,
             deepcopy(self.tag, memo)
         )
         order.fill_price = self.fill_price
         return order
+
+
+class BuyMarket(MarketOrder):
+    __slots__ = ()
+    is_buy_order = True
+
+
+class SellMarket(MarketOrder):
+    __slots__ = ()
+    is_buy_order = False
 
 
 class LimitOrder(Order):
@@ -165,13 +193,13 @@ class LimitOrder(Order):
                  agent_id: int,
                  time_placed: pd.Timestamp,
                  symbol: str,
+                 *,
                  quantity: int,
-                 is_buy_order: bool,
                  limit_price: int,
                  order_id: Optional[int] = None,
                  tag: Any = None) -> None:
 
-        super().__init__(agent_id, time_placed, symbol, quantity, is_buy_order, order_id, tag)
+        super().__init__(agent_id, time_placed, symbol, quantity, order_id, tag)
 
         # The limit price is the minimum price the agent will accept (for a sell order) or
         # the maximum price the agent will pay (for a buy order).
@@ -201,32 +229,52 @@ class LimitOrder(Order):
     __repr__ = __str__
 
     def __copy__(self) -> 'LimitOrder':
-        order = LimitOrder(
+        order = self.__class__(
             self.agent_id,
             self.time_placed,
             self.symbol,
-            self.quantity,
-            self.is_buy_order,
-            self.limit_price,
-            self.order_id,
-            self.tag
+            quantity=self.quantity,
+            limit_price=self.limit_price,
+            order_id=self.order_id,
+            tag=self.tag
         )
         order.fill_price = self.fill_price
         return order
 
     def __deepcopy__(self, memo: Optional[Dict[int, Any]] = None) -> 'LimitOrder':
-        order = LimitOrder(
+        order = self.__class__(
             self.agent_id,
             self.time_placed,
             self.symbol,
-            self.quantity,
-            self.is_buy_order,
-            self.limit_price,
-            self.order_id,
-            deepcopy(self.tag, memo)
+            quantity=self.quantity,
+            limit_price=self.limit_price,
+            order_id=self.order_id,
+            tag=deepcopy(self.tag, memo)
         )
         order.fill_price = self.fill_price
         return order
+
+    def isMatch(self, other: 'LimitOrder') -> bool:
+        """Returns True if order 'other' can be matched against input 'self'"""
+
+        is_buy_order = self.is_buy_order
+        if is_buy_order is other.is_buy_order:
+            print(f"WARNING: isMatch() called on limit orders of same type: {self} vs {other}")
+            return False
+
+        if is_buy_order:
+            return self.limit_price >= other.limit_price
+        return self.limit_price <= other.limit_price
+
+
+class Bid(LimitOrder):
+    __slots__ = ()
+    is_buy_order = True
+
+
+class Ask(LimitOrder):
+    __slots__ = ()
+    is_buy_order = False
 
 
 class BasketOrder(Order):
@@ -243,10 +291,9 @@ class BasketOrder(Order):
                  time_placed: pd.Timestamp,
                  symbol: str,
                  quantity: int,
-                 is_buy_order: bool,
                  dollar: bool = True,
                  order_id: Optional[int] = None) -> None:
-        super().__init__(agent_id, time_placed, symbol, quantity, is_buy_order, order_id)
+        super().__init__(agent_id, time_placed, symbol, quantity, order_id)
         self.dollar = dollar
 
     if silent_mode:
@@ -270,12 +317,11 @@ class BasketOrder(Order):
     __repr__ = __str__
 
     def __copy__(self) -> 'BasketOrder':
-        order = BasketOrder(
+        order = self.__class__(
             self.agent_id,
             self.time_placed,
             self.symbol,
             self.quantity,
-            self.is_buy_order,
             self.dollar,
             self.order_id
         )
