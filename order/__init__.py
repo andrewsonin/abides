@@ -116,22 +116,6 @@ class Order(metaclass=ABCMeta):
         pass
 
 
-class FilledOrder(Order):
-    __slots__ = ("fill_price",)
-
-    def __init__(self,
-                 agent_id: int,
-                 time_placed: pd.Timestamp,
-                 symbol: str,
-                 quantity: int,
-                 *,
-                 fill_price: int,
-                 order_id: Optional[int] = None,
-                 tag: Any = None) -> None:
-        super().__init__(agent_id, time_placed, symbol, quantity, order_id, tag)
-        self.fill_price = fill_price
-
-
 class MarketOrder(Order):
     __slots__ = ()
 
