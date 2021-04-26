@@ -2,7 +2,7 @@ import pandas as pd
 
 from agent.Agent import Agent
 from agent.examples.SumServiceAgent import SumServiceAgent
-from message import Message
+from abides.message.base import Message
 from util import log_print
 
 

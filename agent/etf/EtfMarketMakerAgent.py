@@ -4,7 +4,7 @@ import pandas as pd
 
 from agent.etf.EtfArbAgent import EtfArbAgent
 from agent.etf.EtfPrimaryAgent import EtfPrimaryAgent
-from message import Message
+from abides.message.base import Message
 from order import BasketOrder
 from util import log_print
 

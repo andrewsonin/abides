@@ -15,10 +15,7 @@ import pandas as pd
 from OrderBook import OrderBook
 from agent.FinancialAgent import FinancialAgent
 from core import Kernel
-from message import (
-    MessageAbstractBase,
-    Message,
-
+from abides.message.types import (
     MarketClosedReply,
 
     OrderRequest,
@@ -51,6 +48,7 @@ from message import (
 
     MarketData
 )
+from abides.message.base import MessageAbstractBase, Message
 from oracle.DataOracle import DataOracle
 from oracle.ExternalFileOracle import ExternalFileOracle
 from oracle.SparseMeanRevertingOracle import SparseMeanRevertingOracle

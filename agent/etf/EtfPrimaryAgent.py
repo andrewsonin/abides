@@ -8,7 +8,7 @@ import pandas as pd
 
 from agent.ExchangeAgent import ExchangeAgent
 from agent.FinancialAgent import FinancialAgent
-from message import Message
+from abides.message.base import Message
 from util import log_print
 
 pd.set_option('display.max_rows', 500)

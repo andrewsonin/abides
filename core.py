@@ -10,7 +10,7 @@ import pandas as pd
 
 from abides._typing import KernelSummaryLogEntry, AgentEventLogEntry, Event, KernelCustomState
 from latency import AgentLatencyModelBase, DefaultAgentLatencyModel, AgentLatencyModel
-from message import MessageAbstractBase, Message, WakeUp
+from abides.message.base import MessageAbstractBase, WakeUp, Message
 from util import log_print
 
 __all__ = (

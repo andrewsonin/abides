@@ -9,7 +9,7 @@ import pandas as pd
 
 from agent.ExchangeAgent import ExchangeAgent
 from agent.FinancialAgent import FinancialAgent
-from message import Message
+from abides.message.base import Message
 from order import MarketOrder, LimitOrder
 from util import log_print
 

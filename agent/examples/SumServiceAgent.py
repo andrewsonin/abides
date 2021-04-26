@@ -1,5 +1,5 @@
 from agent.Agent import Agent
-from message import Message
+from abides.message.base import Message
 from util import log_print
 
 

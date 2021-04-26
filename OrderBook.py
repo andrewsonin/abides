@@ -13,7 +13,8 @@ from tqdm import tqdm
 
 from abides._typing import OrderBookHistoryStep
 from agent.ExchangeAgent import ExchangeAgent
-from message import Message, OrderExecuted, OrderAccepted
+from abides.message.types import OrderExecuted, OrderAccepted
+from abides.message.base import Message
 from order import LimitOrder, Bid, Ask, MarketOrder
 from util import log_print, be_silent
 
