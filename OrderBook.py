@@ -4,17 +4,16 @@
 import sys
 from collections import deque
 from copy import deepcopy
-from itertools import islice
-from typing import Tuple, Deque, Optional
+from itertools import islice, chain
+from typing import List, Deque, Tuple, Dict, MutableSet, Iterable, Optional, Literal
 
 import pandas as pd
 from scipy.sparse import dok_matrix
 from tqdm import tqdm
 
-from abides._typing import OrderBookHistoryStep
+from abides._typing import OrderBookHistoryEntry
+from abides.message.types import OrderExecuted, OrderAccepted, OrderCancelled, OrderModified
 from agent.ExchangeAgent import ExchangeAgent
-from abides.message.types import OrderExecuted, OrderAccepted
-from abides.message.base import Message
 from order import LimitOrder, Bid, Ask, MarketOrder
 from util import log_print, be_silent
 
@@ -30,6 +29,7 @@ class OrderBook:
         "quotes_seen",
         "history",
         "last_update_ts",
+        "limit_ids_seen",
         "_history_unseen",
         "_unrolled_transactions"
     )
@@ -45,17 +45,18 @@ class OrderBook:
         self.last_trade: Optional[int] = None
 
         # Create an empty list of dictionaries to log the full order book depth (price and volume) each time it changes.
-        self.book_log = []
-        self.quotes_seen = set()
+        self.book_log: List[Dict] = []
+        self.quotes_seen: MutableSet[int] = set()
 
         # Last timestamp the orderbook for that symbol was updated
         self.last_update_ts: Optional[pd.Timestamp] = None
 
         # Create an order history for the exchange to report to certain agent types
-        self.history: Deque[OrderBookHistoryStep] = deque([{}], exchange.stream_history + 1)
+        self.history: Deque[OrderBookHistoryEntry] = deque((), exchange.stream_history)
+        self.limit_ids_seen: MutableSet[int] = set()
 
         # Internal variables used for computing transacted volumes
-        self._history_unseen = 1
+        self._history_unseen = 0
         self._unrolled_transactions = None
 
     def handleLimitOrder(self, order: LimitOrder) -> None:
@@ -79,17 +80,20 @@ class OrderBook:
         history = self.history
         submitted_order_id = order.order_id
         submitted_agent_id = order.agent_id
-        history[0][submitted_order_id] = {
-            'entry_time': exchange.current_time,
-            'quantity': order.quantity,
-            'is_buy_order': order.is_buy_order,
-            'limit_price': order.limit_price,
-            'transactions': [],
-            'modifications': [],
-            'cancellations': []
-        }
-
-        self.prettyPrint()
+        history.appendleft(
+            {
+                'order_id': submitted_order_id,
+                'entry_time': exchange.current_time,
+                'quantity': order.quantity,
+                'is_buy_order': order.is_buy_order,
+                'limit_price': order.limit_price,
+                'transactions': [],
+                'modifications': [],
+                'cancellations': []
+            }
+        )
+        self.limit_ids_seen.add(submitted_order_id)
+        self._history_unseen += 1
 
         exchange_id = exchange.id
         executed = []
@@ -166,7 +170,7 @@ class OrderBook:
             for q, p in executed:
                 log_print(f"Executed: {q} @ {p}")
                 trade_qty += q
-                trade_price += (p * q)
+                trade_price += (p * q)  # type: ignore
 
             avg_price = round(trade_price / trade_qty)
             log_print(f"Avg: {trade_qty} @ ${avg_price:0.4f}")
@@ -174,14 +178,11 @@ class OrderBook:
 
             self.last_trade = avg_price
 
-            # Transaction occurred, so do append left new dict
-            history.appendleft({})
-            self._history_unseen += 1
-
         # Finally, log the full depth of the order book, ONLY if we have been requested to store the order book
         # for later visualization. (This is slow.)
+        book_log = self.book_log
         if exchange.book_freq is not None:
-            row = {'QuoteTime': exchange.current_time}
+            row: Dict = {'QuoteTime': exchange.current_time}
             quotes_seen = self.quotes_seen
             for quote, volume in self.getInsideBids():
                 row[quote] = -volume
@@ -193,8 +194,8 @@ class OrderBook:
                     )
                 row[quote] = volume
                 quotes_seen.add(quote)
-            self.book_log.append(row)
-        self.last_update_ts = self.exchange.current_time
+            book_log.append(row)
+        self.last_update_ts = exchange.current_time
         self.prettyPrint()
 
     def handleMarketOrder(self, order: MarketOrder) -> None:
@@ -210,7 +211,7 @@ class OrderBook:
         is_buy_order = order.is_buy_order
         orderbook_side = self.getInsideAsks() if is_buy_order else self.getInsideBids()
 
-        limit_orders = {}  # limit orders to be placed (key=price, value=quantity)
+        limit_orders: Dict[int, int] = {}  # limit orders to be placed (key=price, value=quantity)
         order_quantity = order.quantity
         for price, size in orderbook_side:
             if order_quantity <= size:
@@ -233,10 +234,7 @@ class OrderBook:
         # (i.e. executes at least a partial trade, if possible).
 
         # Track which (if any) existing order was matched with the current order.
-        if order.is_buy_order:
-            book = self.asks
-        else:
-            book = self.bids
+        book: Deque[Deque[LimitOrder]] = self.asks if order.is_buy_order else self.bids  # type: ignore
 
         # TODO: Simplify?  It is ever possible to actually select an execution match
         # other than the best bid or best ask? We may not need these execute loops.
@@ -283,18 +281,11 @@ class OrderBook:
         # out one, possibly truncating to the maximum history length.
 
         # The incoming order is guaranteed to exist under index 0.
-        history = self.history
         current_time = self.exchange.current_time
-        history[0][order.order_id]['transactions'].append((current_time, order.quantity))
+        self.history[0]['transactions'].append((current_time, order.quantity))
 
-        matched_order_id = matched_order.order_id
-        matched_quantity = matched_order.quantity
         # The pre-existing order may or may not still be in the recent history.
-        for orders in history:
-            # Find the matched order in history. Update it with this transaction.
-            history_entry = orders.get(matched_order_id, None)
-            if history_entry is not None:
-                history_entry['transactions'].append((current_time, matched_quantity))
+        self._add_event_to_history(matched_order.order_id, current_time, matched_order.quantity, 'transactions')
 
         # Return (only the executed portion of) the matched order.
         return matched_order
@@ -304,133 +295,184 @@ class OrderBook:
         # This does not test for matching/executing orders -- this function
         # should only be called after a failed match/execution attempt.
 
-        if order.is_buy_order:
-            book = self.bids
-        else:
-            book = self.asks
+        book: Deque[Deque[LimitOrder]] = self.asks if order.is_buy_order else self.bids  # type: ignore
 
         if not book:
             # There were no orders on this side of the book.
-            book.append([order])
-        elif not self.isBetterPrice(order, book[-1][0]) and not self.isEqualPrice(order, book[-1][0]):
-            # There were orders on this side, but this order is worse than all of them.
-            # (New lowest bid or highest ask.)
-            book.append([order])
+            book.append(deque([order]))
         else:
-            # There are orders on this side.  Insert this order in the correct position in the list.
-            # Note that o is a LIST of all orders (oldest at index 0) at this same price.
-            for i, o in enumerate(book):
-                if self.isBetterPrice(order, o[0]):
-                    book.insert(i, [order])
-                    break
-                elif self.isEqualPrice(order, o[0]):
-                    book[i].append(order)
-                    break
+            worst_order = book[-1][0]
+            if not self.isBetterPrice(order, worst_order) and not order.hasEqPrice(worst_order):
+                # There were orders on this side, but this order is worse than all of them.
+                # (New lowest bid or highest ask.)
+                book.append(deque([order]))
+            else:
+                # There are orders on this side. Insert this order in the correct position in the list.
+                # Note that o is a DEQUE of all orders (oldest at index 0) at this same price.
+                populate_new_level = False
+                for i, same_price_orders in enumerate(book):
+                    first_order = same_price_orders[0]
+                    if order.hasEqPrice(first_order):
+                        same_price_orders.append(order)
+                        break
+                    if self.isBetterPrice(order, first_order):
+                        populate_new_level = True
+                        break
+                else:
+                    print(f"WARNING: enterLimitOrder() called with order {order.order_id}, but it did not enter")
+                    return
+                if populate_new_level:
+                    book.insert(i, deque([order]))
+        self.last_update_ts = self.exchange.current_time
 
     def cancelLimitOrder(self, order: LimitOrder) -> None:
         # Attempts to cancel (the remaining, unexecuted portion of) a trade in the order book.
         # By definition, this pretty much has to be a limit order.  If the order cannot be found
         # in the order book (probably because it was already fully executed), presently there is
-        # no message back to the agent.  This should possibly change to some kind of failed
+        # no message back to the agent. This should possibly change to some kind of failed
         # cancellation message.  (?)  Otherwise, the agent receives ORDER_CANCELLED with the
         # order as the message body, with the cancelled quantity correctly represented as the
         # number of shares that had not already been executed.
 
-        if order.is_buy_order:
-            book = self.bids
-        else:
-            book = self.asks
+        book: Deque[Deque[LimitOrder]] = self.asks if order.is_buy_order else self.bids  # type: ignore
 
         # If there are no orders on this side of the book, there is nothing to do.
-        if not book: return
+        if not book:
+            print(f"WARNING: cancelLimitOrder() called with order {order.order_id}, but OrderBook is empty")
+            return
 
         # There are orders on this side.  Find the price level of the order to cancel,
         # then find the exact order and cancel it.
         # Note that o is a LIST of all orders (oldest at index 0) at this same price.
-        for i, o in enumerate(book):
-            if self.isEqualPrice(order, o[0]):
+        order_id = order.order_id
+        for i, same_price_orders in enumerate(book):
+            if order.hasEqPrice(same_price_orders[0]):
                 # This is the correct price level.
-                for ci, co in enumerate(book[i]):
-                    if order.order_id == co.order_id:
-                        # Cancel this order.
-                        cancelled_order = book[i].pop(ci)
+                break
+        else:
+            print(
+                f"WARNING: cancelLimitOrder() called with order {order.order_id}, "
+                "but OrderBook doesn't have orders with corresponding limit price"
+            )
+            return
 
-                        # Record cancellation of the order if it is still present in the recent history structure.
-                        for idx, orders in enumerate(self.history):
-                            if cancelled_order.order_id not in orders: continue
+        for ci, order_to_cancel in enumerate(same_price_orders):
+            if order_id == order_to_cancel.order_id:
+                break
+        else:
+            print(
+                f"WARNING: cancelLimitOrder() called with order {order.order_id}, "
+                "but OrderBook doesn't contain order with such ID"
+            )
+            return
 
-                            # Found the cancelled order in history.  Update it with the cancelation.
-                            self.history[idx][cancelled_order.order_id]['cancellations'].append(
-                                (self.exchange.current_time, cancelled_order.quantity))
+        del same_price_orders[ci]
+        # If the cancelled price now has no orders, remove it completely.
+        if not same_price_orders:
+            del book[i]
 
-                        # If the cancelled price now has no orders, remove it completely.
-                        if not book[i]:
-                            del book[i]
+        exchange = self.exchange
+        current_time = exchange.current_time
+        self._add_event_to_history(order_id, current_time, order_to_cancel.quantity, 'cancellations')
 
-                        log_print("CANCELLED: order {}", order)
-                        log_print("SENT: notifications of order cancellation to agent {} for order {}",
-                                  cancelled_order.agent_id, cancelled_order.order_id)
+        agent_id = order_to_cancel.agent_id
+        log_print(
+            f"CANCELLED: order {order}\n"
+            f"SENT: notifications of order cancellation to agent {agent_id} for order {order_id}"
+        )
 
-                        self.exchange.sendMessage(order.agent_id,
-                                                  Message(
-                                                      {"msg": "ORDER_CANCELLED", "order": cancelled_order}))
-                        # We found the order and cancelled it, so stop looking.
-                        self.last_update_ts = self.exchange.current_time
-                        return
+        exchange.sendMessage(
+            agent_id,
+            OrderCancelled(exchange.id, order_to_cancel)
+        )
+        # We found the order and cancelled it, so stop looking.
+        self.last_update_ts = current_time
 
     def modifyLimitOrder(self, order: LimitOrder, new_order: LimitOrder) -> None:
         # Modifies the quantity of an existing limit order in the order book
-        if not self.isSameOrder(order, new_order): return
-        book = self.bids if order.is_buy_order else self.asks
-        if not book: return
-        for i, o in enumerate(book):
-            if self.isEqualPrice(order, o[0]):
-                for mi, mo in enumerate(book[i]):
-                    if order.order_id == mo.order_id:
-                        book[i][0] = new_order
-                        for idx, orders in enumerate(self.history):
-                            if new_order.order_id not in orders: continue
-                            self.history[idx][new_order.order_id]['modifications'].append(
-                                (self.exchange.current_time, new_order.quantity))
-                            log_print("MODIFIED: order {}", order)
-                            log_print("SENT: notifications of order modification to agent {} for order {}",
-                                      new_order.agent_id, new_order.order_id)
-                            self.exchange.sendMessage(order.agent_id,
-                                                      Message(
-                                                          {"msg": "ORDER_MODIFIED", "new_order": new_order}))
-        if order.is_buy_order:
-            self.bids = book
+        if not order.hasEqID(new_order):
+            print(
+                f"WARNING: modifyLimitOrder() called with order {order.order_id} and new_order {new_order.order_id}, "
+                "but their IDs must be equal"
+            )
+            return
+
+        book: Deque[Deque[LimitOrder]] = self.bids if order.is_buy_order else self.asks  # type: ignore
+        if not book:
+            print(f"WARNING: modifyLimitOrder() called with order {order.order_id}, but OrderBook is empty")
+            return
+        for i, same_price_orders in enumerate(book):
+            if order.hasEqPrice(same_price_orders[0]):
+                break
         else:
-            self.asks = book
-        self.last_update_ts = self.exchange.current_time
+            print(
+                f"WARNING: modifyLimitOrder() called with order {order.order_id}, "
+                "but OrderBook doesn't have orders with corresponding limit price"
+            )
+            return
+
+        order_id = order.order_id
+        for mi, order_to_modify in enumerate(same_price_orders):
+            if order_id == order_to_modify.order_id:
+                break
+        else:
+            print(
+                f"WARNING: modifyLimitOrder() called with order {order.order_id}, "
+                "but OrderBook doesn't contain order with such ID"
+            )
+            return
+        same_price_orders[mi] = new_order
+
+        exchange = self.exchange
+        current_time = exchange.current_time
+        self._add_event_to_history(order_id, current_time, new_order.quantity, 'modifications')
+
+        agent_id = new_order.agent_id
+        log_print(
+            f"MODIFIED: order {order}\n"
+            f"SENT: notifications of order modification to agent {agent_id} for order {order_id}"
+        )
+
+        self.exchange.sendMessage(
+            agent_id,
+            OrderModified(
+                exchange.id,
+                new_order
+            )
+        )
+        self.last_update_ts = current_time
 
     # Get the inside bid price(s) and share volume available at each price, to a limit
     # of "depth".  (i.e. inside price, inside 2 prices)  Returns a list of tuples:
     # list index is best bids (0 is best); each tuple is (price, total shares).
-    def getInsideBids(self, depth: int = sys.maxsize):
-        book = []
-        for i in range(min(depth, len(self.bids))):
-            qty = 0
-            price = self.bids[i][0].limit_price
-            for o in self.bids[i]:
-                qty += o.quantity
-            book.append((price, qty))
-
+    def getInsideBids(self, depth: int = sys.maxsize) -> List[Tuple[int, int]]:
+        book = [
+            (same_price_orders[0].limit_price, sum(order.quantity for order in same_price_orders))
+            for same_price_orders
+            in islice(self.bids, depth)
+        ]
         return book
 
     # As above, except for ask price(s).
-    def getInsideAsks(self, depth: int = sys.maxsize):
-        book = []
-        for i in range(min(depth, len(self.asks))):
-            qty = 0
-            price = self.asks[i][0].limit_price
-            for o in self.asks[i]:
-                qty += o.quantity
-            book.append((price, qty))
-
+    def getInsideAsks(self, depth: int = sys.maxsize) -> List[Tuple[int, int]]:
+        book = [
+            (same_price_orders[0].limit_price, sum(order.quantity for order in same_price_orders))
+            for same_price_orders
+            in islice(self.asks, depth)
+        ]
         return book
 
-    def _get_recent_history(self) -> Tuple[OrderBookHistoryStep, ...]:
+    def _add_event_to_history(self,
+                              order_id: int,
+                              current_time: pd.Timestamp,
+                              quantity: int,
+                              update_field: Literal['transactions', 'modifications', 'cancellations']) -> None:
+        for history_entry in self.history:
+            if order_id == history_entry['order_id']:
+                history_entry[update_field].append((current_time, quantity))
+                break
+
+    def _get_recent_history(self) -> Tuple[OrderBookHistoryEntry, ...]:
         """ Gets portion of self.history that has arrived since last call of self.get_transacted_volume.
         :return:
         """
@@ -438,39 +480,45 @@ class OrderBook:
         self._history_unseen = 0
         return recent_history
 
-    def _update_unrolled_transactions(self, recent_history):
+    def _update_unrolled_transactions(self, recent_history: Iterable[OrderBookHistoryEntry]) -> None:
         """ Updates self._transacted_volume["unrolled_transactions"] with data from recent_history
         """
         new_unrolled_txn = self._unrolled_transactions_from_order_history(recent_history)
-        old_unrolled_txn = self._transacted_volume["unrolled_transactions"]
-        total_unrolled_txn = pd.concat([old_unrolled_txn, new_unrolled_txn], ignore_index=True)
-        self._transacted_volume["unrolled_transactions"] = total_unrolled_txn
+        old_unrolled_txn = self._unrolled_transactions
+        total_unrolled_txn = pd.concat((old_unrolled_txn, new_unrolled_txn), ignore_index=True)
+        self._unrolled_transactions = total_unrolled_txn
 
-    def _unrolled_transactions_from_order_history(self, history):
+    @staticmethod
+    def _unrolled_transactions_from_order_history(history):
         """ Returns a DataFrame with columns ['execution_time', 'quantity'] from a dictionary with same format as
             self.history, describing executed transactions.
         """
         # Load history into DataFrame
-        unrolled_history = []
-        for elem in history:
-            for _, val in elem.items():
-                unrolled_history.append(val)
+        unrolled_history = [
+            value
+            for history_entry in history
+            for value in history_entry.values()
+        ]
 
-        unrolled_history_df = pd.DataFrame(unrolled_history, columns=[
-            'entry_time', 'quantity', 'is_buy_order', 'limit_price', 'transactions', 'modifications', 'cancellations'
-        ])
+        unrolled_history_df = pd.DataFrame(
+            unrolled_history,
+            columns=[
+                'entry_time', 'quantity', 'is_buy_order', 'limit_price', 'transactions', 'modifications',
+                'cancellations'
+            ]
+        )
 
         if unrolled_history_df.empty:
             return pd.DataFrame(columns=['execution_time', 'quantity'])
 
-        executed_transactions = unrolled_history_df[
-            unrolled_history_df['transactions'].map(lambda d: len(d)) > 0]  # remove cells that are an empty list
+        executed_transactions = unrolled_history_df[unrolled_history_df['transactions'].map(bool)]
+        # remove cells that are an empty list
 
         #  Reshape into DataFrame with columns ['execution_time', 'quantity']
-        transaction_list = [element for list_ in executed_transactions['transactions'].values for element in list_]
-        unrolled_transactions = pd.DataFrame(transaction_list, columns=['execution_time', 'quantity'])
-        unrolled_transactions = unrolled_transactions.sort_values(by=['execution_time'])
-        unrolled_transactions = unrolled_transactions.drop_duplicates(keep='last')
+        transaction_seq = chain.from_iterable(executed_transactions['transactions'].values)
+        unrolled_transactions = pd.DataFrame(transaction_seq, columns=['execution_time', 'quantity'])
+        unrolled_transactions.sort_values(by=['execution_time'], inplace=True)
+        unrolled_transactions.drop_duplicates(keep='last', inplace=True)
 
         return unrolled_transactions
 
@@ -482,7 +530,7 @@ class OrderBook:
         # Update unrolled transactions DataFrame
         recent_history = self._get_recent_history()
         self._update_unrolled_transactions(recent_history)
-        unrolled_transactions = self._transacted_volume["unrolled_transactions"]
+        unrolled_transactions = self._unrolled_transactions
 
         #  Get transacted volume in time window
         lookback_pd = pd.to_timedelta(lookback_period)
@@ -494,11 +542,12 @@ class OrderBook:
 
     # These could be moved to the LimitOrder class.  We could even operator overload them
     # into >, <, ==, etc.
-    def isBetterPrice(self, order, o):
+    @staticmethod
+    def isBetterPrice(order, o):
         # Returns True if order has a 'better' price than o.  (That is, a higher bid
         # or a lower ask.)  Must be same order type.
         if order.is_buy_order != o.is_buy_order:
-            print("WARNING: isBetterPrice() called on orders of different type: {} vs {}".format(order, o))
+            print(f"WARNING: isBetterPrice() called on orders of different type: {order} vs {o}")
             return False
 
         if order.is_buy_order and (order.limit_price > o.limit_price):
@@ -509,10 +558,8 @@ class OrderBook:
 
         return False
 
-    def isEqualPrice(self, order, o):
-        return order.limit_price == o.limit_price
-
-    def isSameOrder(self, order, new_order):
+    @staticmethod
+    def isSameOrder(order, new_order):
         return order.order_id == new_order.order_id
 
     def book_log_to_df(self):
@@ -530,7 +577,7 @@ class OrderBook:
 
         :return:
         """
-        quotes = sorted(list(self.quotes_seen))
+        quotes = sorted(self.quotes_seen)
         log_len = len(self.book_log)
         quote_idx_dict = {quote: idx for idx, quote in enumerate(quotes)}
         quotes_times = []

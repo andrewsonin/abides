@@ -1,9 +1,9 @@
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 import pandas as pd
 
 from abides.message.base import Message
-from order import Order
+from order import Order, LimitOrder, MarketOrder
 
 __all__ = (
     "MarketClosedReply",
@@ -19,6 +19,7 @@ __all__ = (
     "OrderAccepted",
     "OrderCancelled",
     "OrderExecuted",
+    "OrderModified",
 
     "MarketDataSubscription",
     "MarketDataSubscriptionRequest",
@@ -57,11 +58,11 @@ class MarketData(Message):
     def __init__(self,
                  agent_id: int,
                  symbol: str,
-                 last_transaction: float,
+                 last_transaction: Optional[int],
                  exchange_ts: pd.Timestamp,
                  *,
-                 bids: List[Tuple[float, int]],
-                 asks: List[Tuple[float, int]]) -> None:
+                 bids: List[Tuple[int, int]],
+                 asks: List[Tuple[int, int]]) -> None:
         super().__init__(agent_id)
         self.symbol = symbol
         self.last_transaction = last_transaction
@@ -82,23 +83,27 @@ class OrderRequest(Message):
 class LimitOrderRequest(OrderRequest):
     type = "LIMIT_ORDER"
     __slots__ = ()
+    order: LimitOrder
 
 
 class MarketOrderRequest(OrderRequest):
     type = "MARKET_ORDER"
     __slots__ = ()
+    order: MarketOrder
 
 
 class CancelOrderRequest(OrderRequest):
     type = "CANCEL_ORDER"
     __slots__ = ()
+    order: LimitOrder
 
 
 class ModifyOrderRequest(OrderRequest):
     type = "MODIFY_ORDER"
     __slots__ = ("new_order",)
+    order: LimitOrder
 
-    def __init__(self, sender_id: int, order: Order, new_order: Order) -> None:
+    def __init__(self, sender_id: int, order: LimitOrder, new_order: LimitOrder) -> None:
         super().__init__(sender_id, order)
         self.new_order = new_order
 
@@ -127,6 +132,11 @@ class OrderCancelled(OrderReply):
 
 class OrderExecuted(OrderReply):
     type = "ORDER_EXECUTED"
+    __slots__ = ()
+
+
+class OrderModified(OrderReply):
+    type = "ORDER_MODIFIED"
     __slots__ = ()
 
 
@@ -250,7 +260,7 @@ class QueryLastTradeReply(QueryReplyMessage):
     type = "QUERY_LAST_TRADE_REPLY"
     __slots__ = ("data",)
 
-    def __init__(self, sender_id: int, symbol: str, mkt_closed: bool, data: float) -> None:
+    def __init__(self, sender_id: int, symbol: str, mkt_closed: bool, data: Optional[int]) -> None:
         super().__init__(sender_id, symbol, mkt_closed)
         self.data = data
 
@@ -265,9 +275,9 @@ class QueryLastSpreadReply(QueryReplyMessage):
                  mkt_closed: bool,
                  depth: int,
                  *,
-                 bids: List[Tuple[float, int]],
-                 asks: List[Tuple[float, int]],
-                 data: float,
+                 bids: List[Tuple[int, int]],
+                 asks: List[Tuple[int, int]],
+                 data: Optional[int],
                  book: str) -> None:
         super().__init__(sender_id, symbol, mkt_closed)
         self.depth = depth

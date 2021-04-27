@@ -41,11 +41,11 @@ class OrderBookTransactedVolume(TypedDict):
     history_previous_length: int
 
 
-OrderBookHistoryStep = Dict[int, 'OrderBookHistoryEntry']
 LimitOrderChangeTimeAndVolume = Tuple[pd.Timestamp, int]
 
 
 class OrderBookHistoryEntry(TypedDict):
+    order_id: int
     entry_time: pd.Timestamp
     quantity: int
     is_buy_order: bool

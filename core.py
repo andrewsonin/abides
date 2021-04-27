@@ -179,6 +179,8 @@ class Kernel(Generic[_OracleType]):
         custom_state = self.custom_state
         agent_current_times = self.agent_current_times
         agent_computation_delays = self.agent_computation_delays
+        start_time = self.start_time
+        stop_time = self.stop_time
 
         custom_state.clear()
 
@@ -218,13 +220,13 @@ class Kernel(Generic[_OracleType]):
             # agents are acceptable (e.g. oracles).
             log_print("\n--- Agent.kernelStarting() ---")
             for agent in agents:
-                agent.kernelStarting(self.start_time)
+                agent.kernelStarting(start_time)
 
             # Set the kernel to its startTime.
-            self.current_time = self.start_time
+            self.current_time = start_time
             log_print(
                 "\n--- Kernel Clock started ---\n"
-                f"Kernel.currentTime is now {self.current_time}\n"
+                f"Kernel.currentTime is now {start_time}\n"
                 "\n--- Kernel Event Queue begins ---\n"
                 f"Kernel will start processing messages. Queue length: {len(message_queue.queue)}"
             )
@@ -236,7 +238,7 @@ class Kernel(Generic[_OracleType]):
             # Process messages until there aren't any (at which point there never can
             # be again, because agents only "wake" in response to messages), or until
             # the kernel stop time is reached.
-            while not message_queue.empty() and self.current_time <= self.stop_time:
+            while not message_queue.empty() and self.current_time <= stop_time:
                 # Get the next message in timestamp order (delivery time) and extract it.
                 self.current_time, (agent_id, msg) = message_queue.get()
 

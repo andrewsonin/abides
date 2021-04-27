@@ -115,6 +115,9 @@ class Order(metaclass=ABCMeta):
     def is_buy_order(self) -> bool:
         pass
 
+    def hasEqID(self, other: 'Order') -> bool:
+        return self.order_id == other.order_id
+
 
 class MarketOrder(Order):
     __slots__ = ()
@@ -249,6 +252,9 @@ class LimitOrder(Order):
         if is_buy_order:
             return self.limit_price >= other.limit_price
         return self.limit_price <= other.limit_price
+
+    def hasEqPrice(self, other: 'LimitOrder') -> bool:
+        return self.limit_price == other.limit_price
 
 
 class Bid(LimitOrder):

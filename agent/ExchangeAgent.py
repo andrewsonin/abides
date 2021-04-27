@@ -13,8 +13,7 @@ import numpy as np
 import pandas as pd
 
 from OrderBook import OrderBook
-from agent.FinancialAgent import FinancialAgent
-from core import Kernel
+from abides.message.base import MessageAbstractBase, Message
 from abides.message.types import (
     MarketClosedReply,
 
@@ -48,7 +47,8 @@ from abides.message.types import (
 
     MarketData
 )
-from abides.message.base import MessageAbstractBase, Message
+from agent.FinancialAgent import FinancialAgent
+from core import Kernel
 from oracle.DataOracle import DataOracle
 from oracle.ExternalFileOracle import ExternalFileOracle
 from oracle.SparseMeanRevertingOracle import SparseMeanRevertingOracle
@@ -275,10 +275,10 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
         for agent_id, params in subscription_dict.items():
             for symbol, (levels, freq, last_agent_update) in params.items():
                 order_book = order_books[symbol]
-                orderbook_last_update = order_book.last_update_ts
-                if freq == 0 or \
-                        orderbook_last_update > last_agent_update \
-                        and (orderbook_last_update - last_agent_update).delta >= freq:
+                ob_last_update = order_book.last_update_ts
+                if freq == 0 or (ob_last_update is not None
+                                 and ob_last_update > last_agent_update
+                                 and (ob_last_update - last_agent_update).delta >= freq):
                     self.sendMessage(
                         agent_id,
                         MarketData(
@@ -292,7 +292,7 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
                     )
                     agent_subscriptions = subscription_dict[agent_id]
                     levels, freq, _ = agent_subscriptions[symbol]
-                    agent_subscriptions[symbol] = (levels, freq, orderbook_last_update)
+                    agent_subscriptions[symbol] = (levels, freq, ob_last_update)
 
     def logOrderBookSnapshots(self, symbol: str) -> None:
         """
