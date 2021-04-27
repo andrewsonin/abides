@@ -11,7 +11,7 @@ import pandas as pd
 from scipy.sparse import dok_matrix
 from tqdm import tqdm
 
-from abides._typing import OrderBookHistoryEntry
+from abides._typing import OrderBookHistoryStep
 from abides.message.types import OrderExecuted, OrderAccepted, OrderCancelled, OrderModified
 from agent.ExchangeAgent import ExchangeAgent
 from order import LimitOrder, Bid, Ask, MarketOrder
@@ -29,7 +29,6 @@ class OrderBook:
         "quotes_seen",
         "history",
         "last_update_ts",
-        "limit_ids_seen",
         "_history_unseen",
         "_unrolled_transactions"
     )
@@ -52,11 +51,10 @@ class OrderBook:
         self.last_update_ts: Optional[pd.Timestamp] = None
 
         # Create an order history for the exchange to report to certain agent types
-        self.history: Deque[OrderBookHistoryEntry] = deque((), exchange.stream_history)
-        self.limit_ids_seen: MutableSet[int] = set()
+        self.history: Deque[OrderBookHistoryStep] = deque([{}], exchange.stream_history + 1)
 
         # Internal variables used for computing transacted volumes
-        self._history_unseen = 0
+        self._history_unseen = 1
         self._unrolled_transactions = None
 
     def handleLimitOrder(self, order: LimitOrder) -> None:
@@ -80,20 +78,15 @@ class OrderBook:
         history = self.history
         submitted_order_id = order.order_id
         submitted_agent_id = order.agent_id
-        history.appendleft(
-            {
-                'order_id': submitted_order_id,
-                'entry_time': exchange.current_time,
-                'quantity': order.quantity,
-                'is_buy_order': order.is_buy_order,
-                'limit_price': order.limit_price,
-                'transactions': [],
-                'modifications': [],
-                'cancellations': []
-            }
-        )
-        self.limit_ids_seen.add(submitted_order_id)
-        self._history_unseen += 1
+        history[0][submitted_order_id] = {
+            'entry_time': exchange.current_time,
+            'quantity': order.quantity,
+            'is_buy_order': order.is_buy_order,
+            'limit_price': order.limit_price,
+            'transactions': [],
+            'modifications': [],
+            'cancellations': []
+        }
 
         exchange_id = exchange.id
         executed = []
@@ -177,6 +170,10 @@ class OrderBook:
             exchange.logEvent('LAST_TRADE', f"{trade_qty},${avg_price:0.4f}")
 
             self.last_trade = avg_price
+
+            # Transaction occurred, so do append left new dict
+            history.appendleft({})
+            self._history_unseen += 1
 
         # Finally, log the full depth of the order book, ONLY if we have been requested to store the order book
         # for later visualization. (This is slow.)
@@ -282,7 +279,7 @@ class OrderBook:
 
         # The incoming order is guaranteed to exist under index 0.
         current_time = self.exchange.current_time
-        self.history[0]['transactions'].append((current_time, order.quantity))
+        self.history[0][order.order_id]['transactions'].append((current_time, order.quantity))
 
         # The pre-existing order may or may not still be in the recent history.
         self._add_event_to_history(matched_order.order_id, current_time, matched_order.quantity, 'transactions')
@@ -467,12 +464,13 @@ class OrderBook:
                               current_time: pd.Timestamp,
                               quantity: int,
                               update_field: Literal['transactions', 'modifications', 'cancellations']) -> None:
-        for history_entry in self.history:
-            if order_id == history_entry['order_id']:
+        for orders in self.history:
+            history_entry = orders.get(order_id, None)
+            if history_entry is not None:
                 history_entry[update_field].append((current_time, quantity))
                 break
 
-    def _get_recent_history(self) -> Tuple[OrderBookHistoryEntry, ...]:
+    def _get_recent_history(self) -> Tuple[OrderBookHistoryStep, ...]:
         """ Gets portion of self.history that has arrived since last call of self.get_transacted_volume.
         :return:
         """
@@ -480,7 +478,7 @@ class OrderBook:
         self._history_unseen = 0
         return recent_history
 
-    def _update_unrolled_transactions(self, recent_history: Iterable[OrderBookHistoryEntry]) -> None:
+    def _update_unrolled_transactions(self, recent_history: Iterable[OrderBookHistoryStep]) -> None:
         """ Updates self._transacted_volume["unrolled_transactions"] with data from recent_history
         """
         new_unrolled_txn = self._unrolled_transactions_from_order_history(recent_history)
