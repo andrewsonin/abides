@@ -28,6 +28,7 @@ class OrderBook:
         "book_log",
         "quotes_seen",
         "history",
+        "order_ids",
         "last_update_ts",
         "_history_unseen",
         "_unrolled_transactions"
@@ -52,46 +53,60 @@ class OrderBook:
 
         # Create an order history for the exchange to report to certain agent types
         self.history: Deque[OrderBookHistoryStep] = deque([{}], exchange.stream_history + 1)
+        self.order_ids: MutableSet[int] = set()
 
         # Internal variables used for computing transacted volumes
         self._history_unseen = 1
         self._unrolled_transactions = None
 
     def handleLimitOrder(self, order: LimitOrder) -> None:
-        # Matches a limit order or adds it to the order book. Handles partial matches piecewise,
-        # consuming all possible shares at the best price before moving on, without regard to
-        # order size "fit" or minimizing number of transactions. Sends one notification per
-        # match.
-        book_symbol = self.symbol
+        """
+        Matches a limit order or adds it to the order book. Handles partial matches piecewise,
+        consuming all possible shares at the best price before moving on, without regard to
+        order size "fit" or minimizing number of transactions. Sends one notification per
+        match.
+        """
+        submitted_order_id = order.order_id
         order_symbol = order.symbol
+        order_ids = self.order_ids
+        if submitted_order_id in order_ids:
+            log_print(
+                f"WARNING: {order_symbol} order with ID {submitted_order_id} discarded. "
+                "Order with such ID is already present in this Order Book"
+            )
+            return
+
+        book_symbol = self.symbol
         if order_symbol != book_symbol:
-            log_print(f"{order_symbol} order discarded. Does not match OrderBook symbol: {book_symbol}")
+            log_print(f"WARNING: {order_symbol} order discarded. Does not match OrderBook symbol: {book_symbol}")
             return
 
         order_quantity = order.quantity
         if not isinstance(order_quantity, int) or order_quantity <= 0:
-            log_print(f"{order_symbol} order discarded. Quantity ({order_quantity}) must be a positive integer.")
+            log_print(
+                f"WARNING: {order_symbol} order discarded. Quantity ({order_quantity}) must be a positive integer."
+            )
             return
 
         # Add the order under index 0 of history: orders since the most recent trade
         exchange = self.exchange
         history = self.history
-        submitted_order_id = order.order_id
         submitted_agent_id = order.agent_id
         history[0][submitted_order_id] = {
             'entry_time': exchange.current_time,
-            'quantity': order.quantity,
+            'quantity': order_quantity,
             'is_buy_order': order.is_buy_order,
             'limit_price': order.limit_price,
             'transactions': [],
             'modifications': [],
             'cancellations': []
         }
+        order_ids.add(submitted_order_id)
 
         exchange_id = exchange.id
         executed = []
         while True:
-            matched_order = self.executeLimitOrder(order)
+            matched_order = self._executeLimitOrder(order)
 
             if matched_order is not None:
                 matched_order = deepcopy(matched_order)
@@ -129,7 +144,7 @@ class OrderBook:
                     break
             else:
                 # No matching order was found, so the new order enters the order book. Notify the agent
-                self.enterLimitOrder(deepcopy(order))
+                self._enterLimitOrder(deepcopy(order))
 
                 log_print(
                     f"ACCEPTED: new order {order}\n"
@@ -198,11 +213,13 @@ class OrderBook:
     def handleMarketOrder(self, order: MarketOrder) -> None:
 
         if order.symbol != self.symbol:
-            log_print(f"{order.symbol} order discarded. Does not match OrderBook symbol: {self.symbol}")
+            log_print(f"WARNING: {order.symbol} order discarded. Does not match OrderBook symbol: {self.symbol}")
             return
 
         if not isinstance(order.quantity, int) or order.quantity <= 0:
-            log_print(f"{order.symbol} order discarded. Quantity ({order.quantity}) must be a positive integer.")
+            log_print(
+                f"WARNING: {order.symbol} order discarded. Quantity ({order.quantity}) must be a positive integer."
+            )
             return
 
         is_buy_order = order.is_buy_order
@@ -224,7 +241,7 @@ class OrderBook:
             limit_order = order_type(order.agent_id, order.time_placed, order.symbol, quantity=q, limit_price=p)
             self.handleLimitOrder(limit_order)
 
-    def executeLimitOrder(self, order: LimitOrder) -> Optional[LimitOrder]:
+    def _executeLimitOrder(self, order: LimitOrder) -> Optional[LimitOrder]:
         # Finds a single best match for this order, without regard for quantity.
         # Returns the matched order or None if no match found. DOES remove,
         # or decrement quantity from, the matched order from the order book
@@ -259,6 +276,7 @@ class OrderBook:
             # Consumed entire matched order.
             matched_order = best_limit_orders.popleft()
 
+            self.order_ids.remove(matched_order.order_id)
             # If the matched price now has no orders, remove it completely.
             if not best_limit_orders:
                 book.popleft()
@@ -287,7 +305,7 @@ class OrderBook:
         # Return (only the executed portion of) the matched order.
         return matched_order
 
-    def enterLimitOrder(self, order: LimitOrder) -> None:
+    def _enterLimitOrder(self, order: LimitOrder) -> None:
         # Enters a limit order into the OrderBook in the appropriate location.
         # This does not test for matching/executing orders -- this function
         # should only be called after a failed match/execution attempt.
@@ -332,7 +350,6 @@ class OrderBook:
         # number of shares that had not already been executed.
 
         book: Deque[Deque[LimitOrder]] = self.asks if order.is_buy_order else self.bids  # type: ignore
-
         # If there are no orders on this side of the book, there is nothing to do.
         if not book:
             print(f"WARNING: cancelLimitOrder() called with order {order.order_id}, but OrderBook is empty")
@@ -363,6 +380,7 @@ class OrderBook:
             )
             return
 
+        self.order_ids.remove(order_id)
         del same_price_orders[ci]
         # If the cancelled price now has no orders, remove it completely.
         if not same_price_orders:

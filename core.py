@@ -233,7 +233,7 @@ class Kernel(Generic[_OracleType]):
 
             # Track starting wallclock time and total message count for stats at the end.
             eventQueueWallClockStart = pd.Timestamp('now')
-            ttl_messages = 0
+            total_messages = 0
 
             # Process messages until there aren't any (at which point there never can
             # be again, because agents only "wake" in response to messages), or until
@@ -243,10 +243,10 @@ class Kernel(Generic[_OracleType]):
                 self.current_time, (agent_id, msg) = message_queue.get()
 
                 # Periodically print the simulation time and total messages, even if muted.
-                if not ttl_messages % 100_000:
+                if not total_messages % 100_000:
                     print(
                         f"\n--- Simulation time: {self.fmtTime(self.current_time)}, "
-                        f"messages processed: {ttl_messages}, "
+                        f"messages processed: {total_messages}, "
                         f"wallclock elapsed: {pd.Timestamp('now') - eventQueueWallClockStart} ---\n"
                     )
 
@@ -257,7 +257,7 @@ class Kernel(Generic[_OracleType]):
                     f"at time {self.fmtTime(self.current_time)}"
                 )
 
-                ttl_messages += 1
+                total_messages += 1
 
                 # In between messages, always reset the currentAgentAdditionalDelay.
                 self.current_agent_additional_delay = 0
@@ -329,8 +329,8 @@ class Kernel(Generic[_OracleType]):
 
             print(
                 f"Event Queue elapsed: {event_queue_wallclock_elapsed}, "
-                f"messages: {ttl_messages}, "
-                f"messages per second: {ttl_messages / (event_queue_wallclock_elapsed / _one_s_timedelta):0.1f}"
+                f"messages: {total_messages}, "
+                f"messages per second: {total_messages / (event_queue_wallclock_elapsed / _one_s_timedelta):0.1f}"
             )
             log_print(f"Ending sim {sim}")
 

@@ -218,7 +218,7 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
             elif isinstance(msg, ModifyOrderRequest):
                 self.processModifyOrderRequest(msg)
             else:
-                log_print(f"{self.name} received OrderRequest of type {msg_type}, but not handled")
+                log_print(f"WARNING: {self.name} received OrderRequest of type {msg_type}, but not handled")
 
         elif isinstance(msg, Query):
             if mkt_closed:
@@ -237,7 +237,7 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
             elif isinstance(msg, QueryTransactedVolume):
                 self.processQueryTransactedVolume(msg, mkt_closed)
             else:
-                log_print(f"{self.name} received Query of type {msg_type}, but not handled")
+                log_print(f"WARNING: {self.name} received Query of type {msg_type}, but not handled")
 
         else:
             self.logEvent(msg_type, sender_id)
@@ -246,7 +246,7 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
             elif isinstance(msg, MarketOpeningHourRequest):
                 self.processMarketOpeningHourRequest(msg)
             else:
-                log_print(f"{self.name} received {msg_type}, but not handled")
+                log_print(f"WARNING: {self.name} received {msg_type}, but not handled")
 
     def updateSubscriptionDict(self, msg: MarketDataSubscription, current_time: pd.Timestamp) -> None:
         # The subscription dict is a dictionary with the key = agent ID,
@@ -257,7 +257,7 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
         symbol = msg.symbol
         if isinstance(msg, MarketDataSubscriptionRequest):
             self.subscription_dict[agent_id] = {symbol: (msg.levels, msg.freq, current_time)}
-        else:
+        else:  # MarketDataSubscriptionCancellation
             del self.subscription_dict[agent_id][symbol]
 
     def publishOrderBookData(self) -> None:
