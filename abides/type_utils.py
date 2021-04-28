@@ -1,21 +1,6 @@
-from typing import Tuple, List, Dict, TypedDict, Literal, Any
+from typing import Tuple, List, Dict, TypedDict, Any
 
 import pandas as pd
-
-MessageType = Literal[
-    'LIMIT_ORDER',
-    'MARKET_ORDER',
-    'CANCEL_ORDER',
-    'MODIFY_ORDER',
-
-    'MKT_CLOSED',
-    'MARKET_DATA',
-]
-
-
-class MessageBody(TypedDict):
-    msg: MessageType
-
 
 Event = Any
 

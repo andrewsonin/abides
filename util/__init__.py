@@ -170,8 +170,31 @@ def sigmoid(x, beta):
 
 
 def get_defined_slots(cls: Type) -> Generator[str, None, None]:
-    return (
-        slot
-        for cls in reversed(cls.mro()[:-1])  # Get all parent classes except "object"
-        for slot in cls.__slots__
-    )
+    """
+    Yield all field names defined in the ``__slots__`` attribute of the given class and all of his parents.
+
+    >>> class A:     \
+            __slots__ = ("slot_1",)
+    >>>
+    >>> class B(A):  \
+            pass
+    >>>
+    >>> class C(B):  \
+            __slots__ = ("slot_2", "slot_3")
+    >>>
+    >>> tuple(get_defined_slots(C))
+    ('slot_1', 'slot_2', 'slot_3')
+
+    Args:
+        cls:  class of interest
+    Returns:
+        generator that yields __slots__ field names in the class MRO order
+    """
+    slots_seen = set()
+    for cls in cls.mro()[-2::-1]:  # Get all parent classes except "object"
+        if hasattr(cls, '__slots__'):
+            slots = cls.__slots__
+            if slots not in slots_seen:
+                slots_seen.add(slots)
+                for slot in slots:
+                    yield slot

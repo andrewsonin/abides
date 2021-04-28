@@ -84,11 +84,46 @@ class Order(metaclass=ABCMeta):
         self.tag = tag
 
     def to_dict(self) -> Dict[str, Any]:
+        """
+        Make dictionary representation of the fields defined in the ``Order``.
+
+        >>> bid = Bid(2, pd.Timestamp('1989'), 'AAPL', quantity=3, limit_price=324).to_dict()
+        >>> del bid['order_id']
+        >>> dict_repr = {                          \
+            'agent_id':     2,                     \
+            'time_placed': '1989-01-01T00:00:00',  \
+            'symbol':      'AAPL',                 \
+            'quantity':     3,                     \
+            'fill_price':   None,                  \
+            'tag':          None,                  \
+            'limit_price':  324                    \
+        }
+        >>> assert bid == dict_repr, f"\\nExpected\\n{dict_repr}\\nGot\\n{bid}"
+
+        >>> ask = Ask(5_000_021, pd.Timestamp('2013-11-02'), 'USD/RUB', quantity=20, limit_price=2, tag='$$').to_dict()
+        >>> del ask['order_id']
+        >>> dict_repr = {                          \
+            'agent_id':     5000021,               \
+            'time_placed': '2013-11-02T00:00:00',  \
+            'symbol':      'USD/RUB',              \
+            'quantity':     20,                    \
+            'fill_price':   None,                  \
+            'tag':         '$$',                   \
+            'limit_price':  2                      \
+        }
+        >>> assert ask == dict_repr, f"\\nExpected\\n{dict_repr}\\nGot\\n{ask}"
+
+        Returns:
+            dictionary of fields defined
+        """
         self_copy = deepcopy(self)
         as_dict = {
             s: getattr(self_copy, s)
             for s in self.get_defined_slots()
+            if hasattr(self_copy, s)
         }
+        if hasattr(self_copy, '__dict__'):
+            as_dict.update(self_copy.__dict__)
         as_dict['time_placed'] = as_dict['time_placed'].isoformat()
         return as_dict
 
@@ -115,7 +150,7 @@ class Order(metaclass=ABCMeta):
     def is_buy_order(self) -> bool:
         pass
 
-    def hasEqID(self, other: 'Order') -> bool:
+    def hasSameID(self, other: 'Order') -> bool:
         return self.order_id == other.order_id
 
 
@@ -255,6 +290,49 @@ class LimitOrder(Order):
 
     def hasEqPrice(self, other: 'LimitOrder') -> bool:
         return self.limit_price == other.limit_price
+
+    def hasBetterPrice(self, other: 'LimitOrder') -> bool:
+        """
+        Check if ``other`` order has better price than ``self``.
+
+        >>> f = Ask(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=10)
+        >>> s = Ask(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=100)
+        >>> f.hasBetterPrice(s)
+        True
+
+        >>> f = Bid(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=10)
+        >>> s = Bid(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=100)
+        >>> f.hasBetterPrice(s)
+        False
+
+        >>> f = Bid(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=10)
+        >>> s = Bid(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=10)
+        >>> f.hasBetterPrice(s)
+        False
+
+        >>> f = Ask(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=10)
+        >>> s = Bid(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=100)
+        >>> f.hasBetterPrice(s)
+        WARNING: hasBetterPrice() called on orders of different type: Ask vs Bid
+        False
+
+        Args:
+            other:  other limit order
+        Returns:
+            result of price comparison
+        """
+
+        self_is_buy = self.is_buy_order
+        if self_is_buy is not other.is_buy_order:
+            print(
+                f"WARNING: hasBetterPrice() called on orders of different type: "
+                f"{self.__class__.__name__} vs {other.__class__.__name__}"
+            )
+            return False
+
+        if self_is_buy:
+            return self.limit_price > other.limit_price
+        return self.limit_price < other.limit_price
 
 
 class Bid(LimitOrder):

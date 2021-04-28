@@ -8,7 +8,7 @@ from typing import Tuple, List, Dict, Sequence, Union, Optional, Any, Generic, T
 import numpy as np
 import pandas as pd
 
-from abides._typing import KernelSummaryLogEntry, AgentEventLogEntry, Event, KernelCustomState
+from abides.type_utils import KernelSummaryLogEntry, AgentEventLogEntry, Event, KernelCustomState
 from latency import AgentLatencyModelBase, DefaultAgentLatencyModel, AgentLatencyModel
 from abides.message.base import MessageAbstractBase, WakeUp, Message
 from util import log_print

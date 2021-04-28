@@ -34,7 +34,9 @@ class MessageAbstractBase(metaclass=ABCMeta):
         # Subclasses are strongly encouraged to do so based on their body.
 
     def __lt__(self, other: 'MessageAbstractBase') -> bool:
-        return (self.msg_type_priority, self.id) < (other.msg_type_priority, other.id)
+        self_mtp = self.msg_type_priority
+        other_mtp = other.msg_type_priority
+        return self_mtp < other_mtp or self_mtp == other_mtp and self.id < other.id
 
     get_defined_slots = classmethod(get_defined_slots)
 
