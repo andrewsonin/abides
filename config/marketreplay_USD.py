@@ -9,10 +9,10 @@ from dateutil.parser import parse
 from core import Kernel
 from order import LimitOrder
 from util import __init__
-from agent.ExchangeAgent import ExchangeAgent
-from agent.examples.MomentumAgent import MomentumAgent
-from agent.examples.MarketReplayAgentUSD import MarketReplayAgentUSD
-from agent.OrderBookImbalanceAgent import OrderBookImbalanceAgent
+from abides.agent import exchange
+from abides.agent.examples.MomentumAgent import MomentumAgent
+from abides.agent.examples.MarketReplayAgentUSD import MarketReplayAgentUSD
+from abides.agent import OrderBookImbalanceAgent
 from model.LatencyModel import LatencyModel
 
 ########################################################################################################################
@@ -148,19 +148,19 @@ starting_cash = 10000000  # Cash in this simulator is always in RUB.
 
 stream_history_length = 25000
 
-agents.extend([ExchangeAgent(agent_id=0,
-                             name="EXCHANGE_AGENT",
-                             type="ExchangeAgent",
-                             mkt_open=mkt_open,
-                             mkt_close=mkt_close,
-                             symbols=[symbol],
-                             log_orders=exchange_log_orders,
-                             pipeline_delay=0,
-                             computation_delay=0,
-                             stream_history=stream_history_length,
-                             book_freq=book_freq,
-                             wide_book=True,
-                             random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32, dtype='uint64')))])
+agents.extend([exchange(agent_id=0,
+                        name="EXCHANGE_AGENT",
+                        type="ExchangeAgent",
+                        mkt_open=mkt_open,
+                        mkt_close=mkt_close,
+                        symbols=[symbol],
+                        log_orders=exchange_log_orders,
+                        pipeline_delay=0,
+                        computation_delay=0,
+                        stream_history=stream_history_length,
+                        book_freq=book_freq,
+                        wide_book=True,
+                        random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32, dtype='uint64')))])
 agent_types.extend("ExchangeAgent")
 agent_count += 1
 

@@ -5,7 +5,7 @@ from typing import MutableSet, Optional, Any, Dict
 
 import pandas as pd
 
-from agent.FinancialAgent import dollarize
+from abides.agent import dollarize
 from core import Kernel
 from util import get_defined_slots
 

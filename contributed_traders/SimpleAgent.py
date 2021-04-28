@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from agent.TradingAgent import TradingAgent
+from abides.agent import TradingAgent
 from contributed_traders.util import get_file
 
 
