@@ -3,7 +3,7 @@ from typing import Tuple, List, Optional
 import pandas as pd
 
 from abides.message.base import Message
-from order import Order, LimitOrder, MarketOrder
+from abides.order import Order, LimitOrder, MarketOrder
 
 __all__ = (
     "MarketClosedReply",

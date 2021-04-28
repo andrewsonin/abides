@@ -4,7 +4,7 @@ from math import sqrt
 import pandas as pd
 
 from oracle import Oracle
-from util import log_print
+from abides.util import log_print
 
 
 class ExternalFileOracle(Oracle):

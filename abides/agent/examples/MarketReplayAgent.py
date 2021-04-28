@@ -4,8 +4,8 @@ import pickle
 import pandas as pd
 
 from abides.agent.TradingAgent import TradingAgent
-from order import LimitOrder
-from util import log_print
+from abides.order import LimitOrder
+from abides.util import log_print
 
 
 # from joblib import Memory

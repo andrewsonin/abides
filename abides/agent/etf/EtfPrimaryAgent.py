@@ -6,10 +6,10 @@
 # for stochasticity.
 import pandas as pd
 
-from abides.agent.exchange import ExchangeAgent
 from abides.agent.FinancialAgent import FinancialAgent
+from abides.agent.exchange import ExchangeAgent
 from abides.message.base import Message
-from util import log_print
+from abides.util import log_print
 
 pd.set_option('display.max_rows', 500)
 

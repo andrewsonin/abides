@@ -1,6 +1,6 @@
 from abides.agent.Agent import Agent
 from abides.message.base import Message
-from util import log_print
+from abides.util import log_print
 
 
 # The SumServiceAgent class inherits from the base Agent class.  It is intended
@@ -68,4 +68,4 @@ class SumServiceAgent(Agent):
 
         for sender in self.numbers.keys():
             self.sendMessage(sender, Message({"msg": "SUM_QUERY_RESPONSE", "sender": self.id,
-                                                          "sum": current_sum}))
+                                              "sum": current_sum}))

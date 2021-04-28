@@ -1,19 +1,19 @@
-
 import argparse
+import datetime as dt
+import sys
+
 import numpy as np
 import pandas as pd
-import sys
-import datetime as dt
 from dateutil.parser import parse
 
-from core import Kernel
-from order import LimitOrder
-from util import __init__
-from abides.agent import exchange
-from abides.agent.examples.MomentumAgent import MomentumAgent
-from abides.agent.examples.MarketReplayAgentUSD import MarketReplayAgentUSD
 from abides.agent import OrderBookImbalanceAgent
+from abides.agent import exchange
+from abides.agent.examples.MarketReplayAgentUSD import MarketReplayAgentUSD
+from abides.agent.examples.MomentumAgent import MomentumAgent
+from abides.order import LimitOrder
+from abides.core import Kernel
 from model.LatencyModel import LatencyModel
+from abides import util
 
 ########################################################################################################################
 ############################################### GENERAL CONFIG #########################################################
@@ -74,7 +74,7 @@ parser.add_argument('--mm-pov',
                     default=0.025
                     )
 parser.add_argument('--mm-window-size',
-                    type=__init__.validate_window_size,
+                    type=util.validate_window_size,
                     default='adaptive'
                     )
 parser.add_argument('--mm-min-order-size',
@@ -122,10 +122,10 @@ seed = args.seed  # Random seed specification on the command line.
 if not seed: seed = int(pd.Timestamp.now().timestamp() * 1000000) % (2 ** 32 - 1)
 np.random.seed(seed)
 
-__init__.silent_mode = not args.verbose
+util.silent_mode = not args.verbose
 LimitOrder.silent_mode = not args.verbose
 
-exchange_log_orders = False#True
+exchange_log_orders = False  # True
 log_orders = None
 book_freq = 0
 
@@ -145,7 +145,6 @@ agent_count, agents, agent_types = 0, [], []
 symbol = args.ticker
 starting_cash = 10000000  # Cash in this simulator is always in RUB.
 
-
 stream_history_length = 25000
 
 agents.extend([exchange(agent_id=0,
@@ -160,27 +159,28 @@ agents.extend([exchange(agent_id=0,
                         stream_history=stream_history_length,
                         book_freq=book_freq,
                         wide_book=True,
-                        random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32, dtype='uint64')))])
+                        random_state=np.random.RandomState(
+                            seed=np.random.randint(low=0, high=2 ** 32, dtype='uint64')))])
 agent_types.extend("ExchangeAgent")
 agent_count += 1
 
 # 2) Market Replay Agent
-file_name = 'LOB_df.pkl' 
+file_name = 'LOB_df.pkl'
 orders_file_path = f'./data/marketreplay/input/{file_name}'
 
 agents.extend([MarketReplayAgentUSD(id=1,
-                                 name="MARKET_REPLAY_AGENT",
-                                 type='MarketReplayAgent',
-                                 symbol=symbol,
-                                 log_orders=False,
-                                 date=historical_date,
-                                 start_time=mkt_open,
-                                 end_time=mkt_close,
-                                 orders_file_path=orders_file_path,
-                                 processed_orders_folder_path='./data/marketreplay/output/',
-                                 starting_cash=0,
-                                 random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32,
-                                                                                           dtype='uint64')))])
+                                    name="MARKET_REPLAY_AGENT",
+                                    type='MarketReplayAgent',
+                                    symbol=symbol,
+                                    log_orders=False,
+                                    date=historical_date,
+                                    start_time=mkt_open,
+                                    end_time=mkt_close,
+                                    orders_file_path=orders_file_path,
+                                    processed_orders_folder_path='./data/marketreplay/output/',
+                                    starting_cash=0,
+                                    random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32,
+                                                                                              dtype='uint64')))])
 agent_types.extend("MarketReplayAgent")
 agent_count += 1
 
@@ -202,7 +202,7 @@ agents.extend([MomentumAgent(id=j,
 agent_count += num_momentum_agents
 agent_types.extend("MomentumAgent")
 
-#5.1) imbalance agent
+# 5.1) imbalance agent
 num_obi_agents = 1
 agents.extend([OrderBookImbalanceAgent(agent_id=j, name="OBI_AGENT_{}".format(j), symbol=symbol, entry_threshold=0.2,
                                        freq=3600000000, starting_cash=starting_cash, log_orders=True,
@@ -216,25 +216,25 @@ agent_count += num_obi_agents
 ########################################### KERNEL AND OTHER CONFIG ####################################################
 
 kernel = Kernel("USD Kernel", random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32,
-                                                                                                  dtype='uint64')))
+                                                                                        dtype='uint64')))
 
 kernelStartTime = historical_date
 kernelStopTime = mkt_close + pd.to_timedelta('00:01:00')
 
-defaultComputationDelay = 0 # 50 nanoseconds #there was 50, doesn't work for MarketReplay as this is history that should be 
-#executed at exact order book time.
+defaultComputationDelay = 0  # 50 nanoseconds #there was 50, doesn't work for MarketReplay as this is history that should be
+# executed at exact order book time.
 
 
 # LATENCY
 
-latency_rstate = np.random.RandomState(seed=np.random.randint(low=0, high=2**32))
+latency_rstate = np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32))
 pairwise = (agent_count, agent_count)
 
 # All agents sit on line from my PC to MICEX
 me_to_micex_meters = 10000
-pairwise_distances = __init__.generate_uniform_random_pairwise_dist_on_line(0.0, me_to_micex_meters, agent_count,
-                                                                            random_state=latency_rstate)
-pairwise_latencies = __init__.meters_to_light_ns(pairwise_distances)
+pairwise_distances = util.generate_uniform_random_pairwise_dist_on_line(0.0, me_to_micex_meters, agent_count,
+                                                                        random_state=latency_rstate)
+pairwise_latencies = util.meters_to_light_ns(pairwise_distances)
 
 model_args = {
     'connected': True,
@@ -247,7 +247,7 @@ latency_model = LatencyModel(latency_model='deterministic',
                              )
 # KERNEL
 
-latency = np.zeros((agent_count, agent_count)) #TODO: check this way to setup separate latency for agent
+latency = np.zeros((agent_count, agent_count))  # TODO: check this way to setup separate latency for agent
 noise = [0.0]
 
 kernel.runner(agents=agents,
@@ -255,11 +255,10 @@ kernel.runner(agents=agents,
               stopTime=kernelStopTime,
               agentLatencyModel=latency_model,
               defaultComputationDelay=defaultComputationDelay,
-              #agentLatency=latency,
-              #latencyNoise=noise,
+              # agentLatency=latency,
+              # latencyNoise=noise,
               oracle=None,
               log_dir=args.log_dir)
-
 
 simulation_end_time = dt.datetime.now()
 print("Simulation End Time: {}".format(simulation_end_time))

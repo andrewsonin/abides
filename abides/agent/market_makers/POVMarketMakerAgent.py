@@ -1,6 +1,7 @@
-from abides.agent.TradingAgent import TradingAgent
 import pandas as pd
-from util.__init__ import log_print
+
+from abides.agent.TradingAgent import TradingAgent
+from abides.util import log_print
 
 ANCHOR_TOP_STR = 'top'
 ANCHOR_BOTTOM_STR = 'bottom'
@@ -12,12 +13,13 @@ class POVMarketMakerAgent(TradingAgent):
         period.
     """
 
-    def __init__(self, id, name, type, symbol, starting_cash, pov=0.05, min_order_size=20, window_size=5, anchor=ANCHOR_BOTTOM_STR,
+    def __init__(self, id, name, type, symbol, starting_cash, pov=0.05, min_order_size=20, window_size=5,
+                 anchor=ANCHOR_BOTTOM_STR,
                  num_ticks=20, wake_up_freq='1s', subscribe=False, subscribe_freq=10e9, subscribe_num_levels=1,
                  log_orders=False, random_state=None):
 
         super().__init__(id, name, random_state=random_state, starting_cash=starting_cash, log_orders=log_orders)
-        self.symbol = symbol      # Symbol traded
+        self.symbol = symbol  # Symbol traded
         self.pov = pov  # fraction of transacted volume placed at each price level
         self.min_order_size = min_order_size  # minimum size order to place at each level, if pov <= min
         self.window_size = window_size  # Size in ticks (cents) of how wide the window around mid price is
@@ -27,7 +29,7 @@ class POVMarketMakerAgent(TradingAgent):
         self.wake_up_freq = wake_up_freq  # Frequency of agent wake up
         self.subscribe = subscribe  # Flag to determine whether to subscribe to data or use polling mechanism
         self.subscribe_freq = subscribe_freq  # Frequency in nanoseconds^-1 at which to receive market updates
-                                              # in subscribe mode
+        # in subscribe mode
         self.subscribe_num_levels = subscribe_num_levels  # Number of orderbook levels in subscription mode
         self.log_orders = log_orders
 

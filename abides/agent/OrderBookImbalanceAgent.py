@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 from abides.agent.TradingAgent import TradingAgent
-from util import log_print
+from abides.util import log_print
 
 matplotlib.use('TkAgg')
 _1s_TimeDelta = pd.Timedelta('1s')

@@ -1,7 +1,7 @@
 import pandas as pd
 
 from abides.agent.execution.ExecutionAgent import ExecutionAgent
-from util import log_print
+from abides.util import log_print
 
 
 class VWAPExecutionAgent(ExecutionAgent):

@@ -8,10 +8,10 @@ from typing import Tuple, List, Dict, Sequence, Union, Optional, Any, Generic, T
 import numpy as np
 import pandas as pd
 
-from abides.type_utils import KernelSummaryLogEntry, AgentEventLogEntry, Event, KernelCustomState
-from latency import AgentLatencyModelBase, DefaultAgentLatencyModel, AgentLatencyModel
+from abides.latency import AgentLatencyModelBase, DefaultAgentLatencyModel, AgentLatencyModel
 from abides.message.base import MessageAbstractBase, WakeUp, Message
-from util import log_print
+from abides.type_utils import KernelSummaryLogEntry, AgentEventLogEntry, Event, KernelCustomState
+from abides.util import log_print
 
 __all__ = (
     "Kernel",
@@ -527,7 +527,7 @@ class Kernel(Generic[_OracleType]):
         if self.skip_log:
             return
 
-        path = joinpath(".", "log", self.log_dir)
+        path = joinpath("..", "log", self.log_dir)
         file = f"{filename or self.agents[sender_id].name.replace(' ', '')}.bz2"
 
         makedirs(path, exist_ok=True)
@@ -546,7 +546,7 @@ class Kernel(Generic[_OracleType]):
         )
 
     def writeSummaryLog(self) -> None:
-        path = joinpath(".", "log", self.log_dir)
+        path = joinpath("..", "log", self.log_dir)
         file = "summary_log.bz2"
 
         makedirs(path, exist_ok=True)

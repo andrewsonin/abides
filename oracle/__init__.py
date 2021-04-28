@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 from typing import Optional
 
 import numpy as np
@@ -9,7 +9,7 @@ __all__ = (
 )
 
 
-class Oracle(ABC):
+class Oracle(metaclass=ABCMeta):
     __slots__ = ()
 
     @abstractmethod

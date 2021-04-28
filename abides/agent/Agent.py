@@ -1,3 +1,3 @@
-from core import Agent
+from abides.core import Agent
 
 __all__ = ("Agent",)

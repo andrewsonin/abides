@@ -15,7 +15,7 @@ import pandas as pd
 from joblib import Memory
 
 from oracle import Oracle
-from util import log_print
+from abides.util import log_print
 
 mem = Memory(cachedir='./cache', verbose=0)
 

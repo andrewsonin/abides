@@ -1,6 +1,6 @@
 from abc import ABCMeta, abstractmethod
 
-from util import get_defined_slots
+from abides.util import get_defined_slots
 
 __slots__ = (
     "MessageAbstractBase",

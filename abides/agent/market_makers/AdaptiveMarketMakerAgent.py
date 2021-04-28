@@ -1,9 +1,10 @@
-from abides.agent.TradingAgent import TradingAgent
-import pandas as pd
-from util.__init__ import log_print
-from util.__init__ import sigmoid
 from math import floor, ceil
 
+import pandas as pd
+
+from abides.agent.TradingAgent import TradingAgent
+from abides.util import log_print
+from abides.util import sigmoid
 
 ANCHOR_TOP_STR = 'top'
 ANCHOR_BOTTOM_STR = 'bottom'
@@ -25,26 +26,29 @@ class AdaptiveMarketMakerAgent(TradingAgent):
 
     """
 
-    def __init__(self, id, name, type, symbol, starting_cash, pov=0.05, min_order_size=20, window_size=5, anchor=ANCHOR_MIDDLE_STR,
-                 num_ticks=20, level_spacing=0.5, wake_up_freq='1s', subscribe=False, subscribe_freq=10e9, subscribe_num_levels=1, cancel_limit_delay=50,
+    def __init__(self, id, name, type, symbol, starting_cash, pov=0.05, min_order_size=20, window_size=5,
+                 anchor=ANCHOR_MIDDLE_STR,
+                 num_ticks=20, level_spacing=0.5, wake_up_freq='1s', subscribe=False, subscribe_freq=10e9,
+                 subscribe_num_levels=1, cancel_limit_delay=50,
                  skew_beta=0, spread_alpha=0.85, backstop_quantity=None, log_orders=False, random_state=None):
 
         super().__init__(id, name, random_state=random_state, starting_cash=starting_cash, log_orders=log_orders)
         self.is_adaptive = False
-        self.symbol = symbol      # Symbol traded
+        self.symbol = symbol  # Symbol traded
         self.pov = pov  # fraction of transacted volume placed at each price level
         self.min_order_size = min_order_size  # minimum size order to place at each level, if pov <= min
         self.anchor = self.validateAnchor(anchor)  # anchor either top of window or bottom of window to mid-price
-        self.window_size = self.validateWindowSize(window_size)  # Size in ticks (cents) of how wide the window around mid price is. If equal to
-                                                                # string 'adaptive' then ladder starts at best bid and ask
+        self.window_size = self.validateWindowSize(
+            window_size)  # Size in ticks (cents) of how wide the window around mid price is. If equal to
+        # string 'adaptive' then ladder starts at best bid and ask
         self.num_ticks = num_ticks  # number of ticks on each side of window in which to place liquidity
-        self.level_spacing = level_spacing  #  level spacing as a fraction of the spread
+        self.level_spacing = level_spacing  # level spacing as a fraction of the spread
         self.wake_up_freq = wake_up_freq  # Frequency of agent wake up
         self.subscribe = subscribe  # Flag to determine whether to subscribe to data or use polling mechanism
         self.subscribe_freq = subscribe_freq  # Frequency in nanoseconds^-1 at which to receive market updates
-                                              # in subscribe mode
+        # in subscribe mode
         self.subscribe_num_levels = subscribe_num_levels  # Number of orderbook levels in subscription mode
-        self.cancel_limit_delay  = cancel_limit_delay  # delay in nanoseconds between order cancellations and new limit order placements
+        self.cancel_limit_delay = cancel_limit_delay  # delay in nanoseconds between order cancellations and new limit order placements
 
         self.skew_beta = skew_beta  # parameter for determining order placement imbalance
         self.spread_alpha = spread_alpha  # parameter for exponentially weighted moving average of spread. 1 corresponds to ignoring old values, 0 corresponds to no updates
@@ -62,7 +66,6 @@ class AdaptiveMarketMakerAgent(TradingAgent):
         self.last_spread = INITIAL_SPREAD_VALUE  # last observed spread moving average
         self.tick_size = None if self.is_adaptive else ceil(self.last_spread * self.level_spacing)
         self.LIQUIDITY_DROPOUT_WARNING = f"Liquidity dropout for agent {self.name}."
-
 
     def initialiseState(self):
         """ Returns variables that keep track of whether spread and transacted volume have been observed. """
@@ -267,7 +270,8 @@ class AdaptiveMarketMakerAgent(TradingAgent):
             bid_orders = bid_orders[1:]
 
             ask_price = ask_orders[-1]
-            log_print('{}: Placing SELL limit order of size {} @ price {}', self.name, self.backstop_quantity, ask_price)
+            log_print('{}: Placing SELL limit order of size {} @ price {}', self.name, self.backstop_quantity,
+                      ask_price)
             self.placeLimitOrder(self.symbol, self.backstop_quantity, False, ask_price)
             ask_orders = ask_orders[:-1]
 

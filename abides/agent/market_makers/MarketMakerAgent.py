@@ -1,7 +1,7 @@
-from abides.agent.TradingAgent import TradingAgent
 import pandas as pd
-from util.__init__ import log_print
 
+from abides.agent.TradingAgent import TradingAgent
+from abides.util import log_print
 
 DEFAULT_LEVELS_QUOTE_DICT = {1: [1, 0, 0, 0, 0],
                              2: [.5, .5, 0, 0, 0],
@@ -25,18 +25,18 @@ class MarketMakerAgent(TradingAgent):
 
     """
 
-    def __init__(self, id, name, type, symbol, starting_cash, min_size, max_size , wake_up_freq='1s',
+    def __init__(self, id, name, type, symbol, starting_cash, min_size, max_size, wake_up_freq='1s',
                  subscribe=False, subscribe_freq=10e9, subscribe_num_levels=5, log_orders=False, random_state=None):
 
         super().__init__(id, name, random_state=random_state, starting_cash=starting_cash, log_orders=log_orders)
-        self.symbol = symbol      # Symbol traded
+        self.symbol = symbol  # Symbol traded
         self.min_size = min_size  # Minimum order size
         self.max_size = max_size  # Maximum order size
-        self.size = round(self.random_state.randint(self.min_size, self.max_size) / 2) # order size per LOB side
+        self.size = round(self.random_state.randint(self.min_size, self.max_size) / 2)  # order size per LOB side
         self.wake_up_freq = wake_up_freq  # Frequency of agent wake up
         self.subscribe = subscribe  # Flag to determine whether to subscribe to data or use polling mechanism
         self.subscribe_freq = subscribe_freq  # Frequency in nanoseconds^-1 at which to receive market updates
-                                              # in subscribe mode
+        # in subscribe mode
         self.subscribe_num_levels = subscribe_num_levels  # Number of orderbook levels in subscription mode
         self.subscription_requested = False
         self.log_orders = log_orders
@@ -69,22 +69,22 @@ class MarketMakerAgent(TradingAgent):
             self.cancelOrders()
             mid = self.last_trade[self.symbol]
 
-            self.num_levels = 2 * self.subscribe_num_levels   # Number of price levels to place the trades in
+            self.num_levels = 2 * self.subscribe_num_levels  # Number of price levels to place the trades in
 
             bid, bid_vol, ask, ask_vol = self.getKnownBidAsk(self.symbol)
 
             if bid and ask:
                 mid = int((ask + bid) / 2)
-                spread = int(abs(ask - bid)/2)
+                spread = int(abs(ask - bid) / 2)
             else:
                 log_print(f"SPREAD MISSING at time {currentTime}")
                 spread = self.last_spread
 
             for i in range(self.num_levels):
                 self.size = round(self.random_state.randint(self.min_size, self.max_size) / 2)
-                #bids
+                # bids
                 self.placeLimitOrder(self.symbol, self.size, True, mid - spread - i)
-                #asks
+                # asks
                 self.placeLimitOrder(self.symbol, self.size, False, mid + spread + i)
 
             self.setWakeup(currentTime + self.getWakeFrequency())
@@ -93,8 +93,10 @@ class MarketMakerAgent(TradingAgent):
         elif self.subscribe and self.state == 'AWAITING_MARKET_DATA' and msg.body['msg'] == 'MARKET_DATA':
             self.cancelOrders()
             num_levels_place = len(self.levels_quote_dict.keys())
-            self.num_levels = self.random_state.randint(1, num_levels_place)  # Number of price levels to place the trades in
-            self.size_split = self.levels_quote_dict.get(self.num_levels)  # % of the order size to be placed at different levels
+            self.num_levels = self.random_state.randint(1,
+                                                        num_levels_place)  # Number of price levels to place the trades in
+            self.size_split = self.levels_quote_dict.get(
+                self.num_levels)  # % of the order size to be placed at different levels
             self.placeOrders(self.known_bids[self.symbol], self.known_asks[self.symbol])
             self.state = 'AWAITING_MARKET_DATA'
 
@@ -119,7 +121,6 @@ class MarketMakerAgent(TradingAgent):
                 self.placeLimitOrder(self.symbol, vol, True, price)
             for price, vol in sell_quotes.items():
                 self.placeLimitOrder(self.symbol, vol, False, price)
-
 
     def cancelOrders(self):
         """ cancels all resting limit orders placed by the market maker """

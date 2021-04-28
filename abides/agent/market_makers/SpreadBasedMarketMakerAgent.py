@@ -1,9 +1,10 @@
-from abides.agent.TradingAgent import TradingAgent
-import pandas as pd
-from util.__init__ import log_print
 from collections import namedtuple, deque
-from util.__init__ import ignored
 
+import pandas as pd
+
+from abides.agent.TradingAgent import TradingAgent
+from abides.util import ignored
+from abides.util import log_print
 
 ANCHOR_TOP_STR = 'top'
 ANCHOR_BOTTOM_STR = 'bottom'
@@ -19,7 +20,7 @@ class SpreadBasedMarketMakerAgent(TradingAgent):
                  log_orders=False, random_state=None):
 
         super().__init__(id, name, random_state=random_state, starting_cash=starting_cash, log_orders=log_orders)
-        self.symbol = symbol      # Symbol traded
+        self.symbol = symbol  # Symbol traded
         self.order_size = order_size  # order size per price level
         self.window_size = window_size  # Size in ticks (cents) of how wide the window around mid price is
         self.anchor = self.validateAnchor(anchor)  # anchor either top of window or bottom of window to mid-price
@@ -28,7 +29,7 @@ class SpreadBasedMarketMakerAgent(TradingAgent):
         self.wake_up_freq = wake_up_freq  # Frequency of agent wake up
         self.subscribe = subscribe  # Flag to determine whether to subscribe to data or use polling mechanism
         self.subscribe_freq = subscribe_freq  # Frequency in nanoseconds^-1 at which to receive market updates
-                                              # in subscribe mode
+        # in subscribe mode
         self.subscribe_num_levels = subscribe_num_levels  # Number of orderbook levels in subscription mode
         self.log_orders = log_orders
 

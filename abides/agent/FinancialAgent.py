@@ -3,7 +3,7 @@ from typing import List, Iterable, Union
 
 from typing_extensions import overload
 
-from core import Agent
+from abides.core import Agent
 
 
 @overload

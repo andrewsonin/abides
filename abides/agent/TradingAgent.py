@@ -7,11 +7,11 @@ from typing import Optional, Dict
 import numpy as np
 import pandas as pd
 
-from abides.agent.exchange import ExchangeAgent
 from abides.agent.FinancialAgent import FinancialAgent
+from abides.agent.exchange import ExchangeAgent
 from abides.message.base import Message
-from order import MarketOrder, LimitOrder
-from util import log_print
+from abides.order import MarketOrder, LimitOrder
+from abides.util import log_print
 
 
 # The TradingAgent class (via FinancialAgent, via Agent) is intended as the

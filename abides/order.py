@@ -5,9 +5,9 @@ from typing import MutableSet, Optional, Any, Dict
 
 import pandas as pd
 
-from abides.agent import dollarize
+from abides.agent.FinancialAgent import dollarize
+from abides.util import get_defined_slots
 from core import Kernel
-from util import get_defined_slots
 
 __all__ = (
     "Order",

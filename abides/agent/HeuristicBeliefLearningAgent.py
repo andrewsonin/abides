@@ -3,7 +3,7 @@ import sys
 import numpy as np
 
 from abides.agent.ZeroIntelligenceAgent import ZeroIntelligenceAgent
-from util import log_print
+from abides.util import log_print
 
 np.set_printoptions(threshold=np.inf)
 

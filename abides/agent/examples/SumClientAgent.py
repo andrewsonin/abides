@@ -3,7 +3,7 @@ import pandas as pd
 from abides.agent.Agent import Agent
 from abides.agent.examples.SumServiceAgent import SumServiceAgent
 from abides.message.base import Message
-from util import log_print
+from abides.util import log_print
 
 
 # The SumClientAgent class inherits from the base Agent class.  It is intended
@@ -73,7 +73,7 @@ class SumClientAgent(Agent):
             n2 += self.peer_sum
 
             self.sendMessage(self.serviceAgentID, Message({"msg": "SUM_QUERY", "sender": self.id,
-                                                                       "n1": n1, "n2": n2}))
+                                                           "n1": n1, "n2": n2}))
 
         return
 

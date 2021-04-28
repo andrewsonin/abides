@@ -26,7 +26,7 @@ import numpy as np
 import pandas as pd
 
 from oracle.MeanRevertingOracle import MeanRevertingOracle
-from util import log_print
+from abides.util import log_print
 
 
 class SparseMeanRevertingOracle(MeanRevertingOracle):
