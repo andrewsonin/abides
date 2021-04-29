@@ -1,33 +1,5 @@
-from traceback import format_stack
-from typing import List, Iterable, Union
-
-from typing_extensions import overload
-
 from abides.core import Agent
-
-
-@overload
-def dollarize(cents: Iterable[int]) -> List[str]:
-    pass
-
-
-@overload
-def dollarize(cents: int) -> str:
-    pass
-
-
-# Dollarizes int-cents prices for printing. Defined outside the class for
-# utility access by non-agent classes.
-def dollarize(cents: Union[Iterable[int], int]) -> Union[List[str], str]:
-    if isinstance(cents, Iterable):
-        return list(map(dollarize, cents))  # type: ignore
-    elif isinstance(cents, int):
-        return f"${cents / 100:0.2}"
-    else:
-        # If cents is already a float, there is an error somewhere.
-        error_msg = f"ERROR: dollarize(cents) called without int or iterable of ints: {cents}"
-        print(error_msg)
-        raise TypeError(error_msg, "Current traceback:", ''.join(format_stack()))
+from abides.util import dollarize
 
 
 # The FinancialAgent class contains attributes and methods that should be available

@@ -10,7 +10,7 @@ from abides.agent import OrderBookImbalanceAgent
 from abides.agent import exchange
 from abides.agent.examples.MarketReplayAgentUSD import MarketReplayAgentUSD
 from abides.agent.examples.MomentumAgent import MomentumAgent
-from abides.order import LimitOrder
+from abides.order.types import LimitOrder
 from abides.core import Kernel
 from model.LatencyModel import LatencyModel
 from abides import util

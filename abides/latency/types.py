@@ -1,15 +1,13 @@
-from abc import ABCMeta, abstractmethod
-from typing import Sequence, Tuple
+from typing import Tuple, Sequence
 
 import numpy as np
 
+from abides.latency.base import AgentLatencyModelBase
 
-class AgentLatencyModelBase(metaclass=ABCMeta):
-    __slots__ = ()
-
-    @abstractmethod
-    def get_latency_and_noise(self, sender_id: int, recipient_id: int) -> Tuple[int, int]:
-        pass
+__all__ = (
+    "DefaultAgentLatencyModel",
+    "AgentLatencyModel"
+)
 
 
 class DefaultAgentLatencyModel(AgentLatencyModelBase):

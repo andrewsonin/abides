@@ -1,6 +1,7 @@
 import warnings
 from contextlib import contextmanager
-from typing import Type, Generator
+from traceback import format_stack
+from typing import Type, Generator, Union, Iterable, List, overload
 
 import numpy as np
 import pandas as pd
@@ -171,7 +172,7 @@ def sigmoid(x, beta):
 
 def get_defined_slots(cls: Type) -> Generator[str, None, None]:
     """
-    Yield all field names defined in the ``__slots__`` attribute of the given class and all of his parents.
+    Yield all field names defined in the ``__slots__`` attributes of the given class and all of his parents.
 
     >>> class A:     \
             __slots__ = ("slot_1",)
@@ -198,3 +199,35 @@ def get_defined_slots(cls: Type) -> Generator[str, None, None]:
                 slots_seen.add(slots)
                 for slot in slots:
                     yield slot
+
+
+@overload
+def dollarize(cents: Iterable[int]) -> List[str]:
+    pass
+
+
+@overload
+def dollarize(cents: int) -> str:
+    pass
+
+
+def dollarize(cents: Union[Iterable[int], int]) -> Union[List[str], str]:
+    """
+    Dollarize int-cents prices for printing. Defined outside the class for
+    utility access by non-agent classes.
+    TODO
+    Args:
+        cents:
+
+    Returns:
+
+    """
+    if isinstance(cents, Iterable):
+        return list(map(dollarize, cents))  # type: ignore
+    elif isinstance(cents, int):
+        return f"${cents / 100:0.2}"
+    else:
+        # If cents is already a float, there is an error somewhere.
+        error_msg = f"ERROR: dollarize(cents) called without int or iterable of ints: {cents}"
+        print(error_msg)
+        raise TypeError(error_msg, "Current traceback:", ''.join(format_stack()))

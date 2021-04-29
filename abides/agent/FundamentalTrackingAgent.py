@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from abides.agent.TradingAgent import TradingAgent
-from oracle import Oracle
+from abides.oracle.base import Oracle
 
 
 # >>> TYPING >>>

@@ -2,7 +2,7 @@ from abc import ABCMeta, abstractmethod
 
 from abides.util import get_defined_slots
 
-__slots__ = (
+__all__ = (
     "MessageAbstractBase",
     "WakeUp",
     "Message"
