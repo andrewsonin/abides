@@ -63,7 +63,7 @@ from abides.message.types import (
 from abides.oracle.types import DataOracle, ExternalFileOracle, SparseMeanRevertingOracle
 from abides.order.base import MarketOrder, LimitOrder
 from abides.order.types import Bid, Ask
-from abides.typing import OrderBookHistoryStep
+from abides.typing.exchange import OrderBookHistoryStep
 from abides.util import log_print, be_silent
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -101,7 +101,7 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
                  mkt_open: pd.Timestamp,
                  mkt_close: pd.Timestamp,
                  symbols: Iterable[str],
-                 book_freq: Union[pd.DateOffset, str] = 'S',
+                 book_freq: Union[pd.DateOffset, pd.Timedelta, str, None] = 'S',
                  wide_book: bool = False,
                  pipeline_delay: int = 40_000,
                  computation_delay: int = 1,
@@ -323,7 +323,9 @@ class ExchangeAgent(FinancialAgent, Generic[_OracleType]):
                 element.
             """
             forbidden_values = [0, 19999900]  # TODO: Put constant value in more sensible place!
-            quotes = sorted(s)
+            quotes = sorted(i for i in s if i not in {0, 19999900})
+            quotes.remove(0)
+            quotes.remove(19999900)
             for val in forbidden_values:
                 try:
                     quotes.remove(val)

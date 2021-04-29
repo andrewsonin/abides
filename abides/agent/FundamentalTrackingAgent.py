@@ -1,19 +1,12 @@
-from typing import List, TypedDict
+from typing import List
 
 import numpy as np
 import pandas as pd
 
 from abides.agent.TradingAgent import TradingAgent
 from abides.oracle.base import Oracle
+from abides.typing.agent.fundamental import FundamentalInfo
 
-
-# >>> TYPING >>>
-class FundamentalInfo(TypedDict):
-    FundamentalTime: int
-    FundamentalValue: int
-
-
-# <<< TYPING <<<
 
 class FundamentalTrackingAgent(TradingAgent):
     """ Agent who collects and saves to disk noise-free observations of the fundamental. """

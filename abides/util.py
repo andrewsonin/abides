@@ -7,12 +7,11 @@ import numpy as np
 import pandas as pd
 from scipy.spatial.distance import pdist, squareform
 
+from abides.globals import silent_mode
+
 # General purpose utility functions for the simulator, attached to no particular class.
 # Available to any agent or other module/utility.  Should not require references to
 # any simulator object (kernel, agent, etc).
-
-# Module level variable that can be changed by config files.
-silent_mode = False
 
 # This optional log_print function will call str.format(args) and print the
 # result to stdout.  It will return immediately when silent mode is active.

@@ -1,30 +1,12 @@
-from typing import Tuple, List, Dict, TypedDict, Any
+from typing import TypedDict, Dict, Tuple, List
 
 import pandas as pd
 
-Event = Any
-
-
-class KernelSummaryLogEntry(TypedDict):
-    AgentID: int
-    AgentStrategy: str
-    EventType: str
-    Event: Event
-
-
-KernelCustomState = Dict[str, Any]
-
-
-class AgentEventLogEntry(TypedDict):
-    EventTime: pd.Timestamp
-    EventType: str
-    Event: Event
-
-
-class OrderBookTransactedVolume(TypedDict):
-    unrolled_transactions: Any
-    history_previous_length: int
-
+__all__ = (
+    "OrderBookHistoryStep",
+    "OrderBookHistoryEntry",
+    "LimitOrderChangeTimeAndVolume"
+)
 
 OrderBookHistoryStep = Dict[int, 'OrderBookHistoryEntry']
 LimitOrderChangeTimeAndVolume = Tuple[pd.Timestamp, int]

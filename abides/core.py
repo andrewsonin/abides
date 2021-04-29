@@ -1,17 +1,19 @@
 from copy import deepcopy
+from heapq import heappush, heappop
 from os import PathLike, makedirs
 from os.path import join as joinpath
 from pathlib import Path
-from queue import PriorityQueue
 from typing import Tuple, List, Dict, Sequence, Union, Optional, Any, Generic, Type, TypeVar
 
 import numpy as np
 import pandas as pd
 
+from abides.constants import one_ns_timedelta, one_s_timedelta
 from abides.latency.base import AgentLatencyModelBase
 from abides.latency.types import DefaultAgentLatencyModel, AgentLatencyModel
 from abides.message.base import MessageAbstractBase, WakeUp, Message
-from abides.typing import KernelSummaryLogEntry, AgentEventLogEntry, Event, KernelCustomState
+from abides.typing import Event
+from abides.typing.core import KernelSummaryLogEntry, AgentEventLogEntry, KernelCustomState
 from abides.util import log_print
 
 __all__ = (
@@ -19,10 +21,18 @@ __all__ = (
     "Agent"
 )
 
-_one_ns_timedelta = pd.Timedelta(1)
-_one_s_timedelta = np.timedelta64(1, 's')
-
+_T = TypeVar('_T')
 _OracleType = TypeVar('_OracleType')
+
+
+class PriorityQueue(list, Generic[_T]):
+    __slots__ = ()
+
+    def get(self) -> _T:
+        return heappop(self)
+
+    def put(self, item: _T) -> None:
+        heappush(self, item)
 
 
 class Kernel(Generic[_OracleType]):
@@ -229,7 +239,7 @@ class Kernel(Generic[_OracleType]):
                 "\n--- Kernel Clock started ---\n"
                 f"Kernel.currentTime is now {start_time}\n"
                 "\n--- Kernel Event Queue begins ---\n"
-                f"Kernel will start processing messages. Queue length: {len(message_queue.queue)}"
+                f"Kernel will start processing messages. Queue length: {len(message_queue)}"
             )
 
             # Track starting wallclock time and total message count for stats at the end.
@@ -239,7 +249,7 @@ class Kernel(Generic[_OracleType]):
             # Process messages until there aren't any (at which point there never can
             # be again, because agents only "wake" in response to messages), or until
             # the kernel stop time is reached.
-            while not message_queue.empty() and self.current_time <= stop_time:
+            while message_queue and self.current_time <= stop_time:
                 # Get the next message in timestamp order (delivery time) and extract it.
                 self.current_time, (agent_id, msg) = message_queue.get()
 
@@ -303,7 +313,7 @@ class Kernel(Generic[_OracleType]):
                     f"delayed from {self.fmtTime(self.current_time)} to {self.fmtTime(agent_current_times[agent_id])}"
                 )
 
-            if message_queue.empty():
+            if not message_queue:
                 log_print("\n--- Kernel Event Queue empty ---")
             elif self.current_time > self.stop_time:
                 log_print("\n--- Kernel Stop Time surpassed ---")
@@ -331,7 +341,7 @@ class Kernel(Generic[_OracleType]):
             print(
                 f"Event Queue elapsed: {event_queue_wallclock_elapsed}, "
                 f"messages: {total_messages}, "
-                f"messages per second: {total_messages / (event_queue_wallclock_elapsed / _one_s_timedelta):0.1f}"
+                f"messages per second: {total_messages / (event_queue_wallclock_elapsed / one_s_timedelta):0.1f}"
             )
             log_print(f"Ending sim {sim}")
 
@@ -420,7 +430,7 @@ class Kernel(Generic[_OracleType]):
         # kernel will not supply any parameters to the wakeup() call.
 
         if requested_time is None:
-            requested_time = self.current_time + _one_ns_timedelta
+            requested_time = self.current_time + one_ns_timedelta
         elif requested_time < self.current_time:
             raise ValueError(
                 "setWakeup() called with requested time not in future",

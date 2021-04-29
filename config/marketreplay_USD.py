@@ -6,14 +6,14 @@ import numpy as np
 import pandas as pd
 from dateutil.parser import parse
 
+import abides.globals
 from abides.agent import OrderBookImbalanceAgent
-from abides.agent import exchange
 from abides.agent.examples.MarketReplayAgentUSD import MarketReplayAgentUSD
 from abides.agent.examples.MomentumAgent import MomentumAgent
 from abides.order.base import LimitOrder
 from abides.core import Kernel
 from model.LatencyModel import LatencyModel
-from abides import util
+from abides import util, exchange
 
 ########################################################################################################################
 ############################################### GENERAL CONFIG #########################################################
@@ -122,7 +122,7 @@ seed = args.seed  # Random seed specification on the command line.
 if not seed: seed = int(pd.Timestamp.now().timestamp() * 1000000) % (2 ** 32 - 1)
 np.random.seed(seed)
 
-util.silent_mode = not args.verbose
+abides.globals.silent_mode = not args.verbose
 LimitOrder.silent_mode = not args.verbose
 
 exchange_log_orders = False  # True
@@ -231,7 +231,7 @@ latency_rstate = np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 3
 pairwise = (agent_count, agent_count)
 
 # All agents sit on line from my PC to MICEX
-me_to_micex_meters = 10000
+me_to_micex_meters = 10_000
 pairwise_distances = util.generate_uniform_random_pairwise_dist_on_line(0.0, me_to_micex_meters, agent_count,
                                                                         random_state=latency_rstate)
 pairwise_latencies = util.meters_to_light_ns(pairwise_distances)

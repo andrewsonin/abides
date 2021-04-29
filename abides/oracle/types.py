@@ -1,22 +1,26 @@
-# The DataOracle class reads real historical trade data (not price or quote)
-# from a given date in history to be resimulated.  It stores these trades
-# in a time-sorted array at maximum resolution.  It can be called by
-# certain "background" agents to obtain noisy observations about the "real"
-# price of a stock at a current time.  It is intended to provide some realistic
-# behavior and "price gravity" to the simulated market -- i.e. to make the
-# market behave something like historical reality in the absence of whatever
-# experiment we are running with more active agent types.
+"""
+The DataOracle class reads real historical trade data (not price or quote)
+from a given date in history to be resimulated.  It stores these trades
+in a time-sorted array at maximum resolution.  It can be called by
+certain "background" agents to obtain noisy observations about the "real"
+price of a stock at a current time.  It is intended to provide some realistic
+behavior and "price gravity" to the simulated market -- i.e. to make the
+market behave something like historical reality in the absence of whatever
+experiment we are running with more active agent types.
+"""
 
 import datetime as dt
 import os
 from bisect import bisect_left
 from math import sqrt, exp
+from typing import List
 
 import numpy as np
 import pandas as pd
 from joblib import Memory
 
 from abides.oracle.base import Oracle
+from abides.typing import FileName
 from abides.util import log_print
 
 mem = Memory(cachedir='./cache', verbose=0)
@@ -30,7 +34,7 @@ __all__ = (
 
 
 # @mem.cache
-def read_trades(trade_file, symbols):
+def read_trades(trade_file: FileName, symbols: List[str]) -> pd.DataFrame:
     log_print("Data not cached. This will take a minute...")
 
     df = pd.read_pickle(trade_file, compression='bz2')
@@ -38,7 +42,7 @@ def read_trades(trade_file, symbols):
     # Filter to requested symbols.
     df = df.loc[symbols]
 
-    # Filter duplicate indices (trades on two exchanges at the PRECISE same time).  Rare.
+    # Filter duplicate indices (trades on two exchanges at the PRECISE same time). Rare.
     df = df[~df.index.duplicated(keep='first')]
 
     # Ensure resulting index is sorted for best performance later on.
@@ -48,7 +52,7 @@ def read_trades(trade_file, symbols):
 
 
 class DataOracle(Oracle):
-    def __init__(self, historical_date=None, symbols=None, data_dir=None):
+    def __init__(self, historical_date=None, symbols: List[str] = None, data_dir=None):
         self.historical_date = historical_date
         self.symbols = symbols
 
@@ -86,7 +90,7 @@ class DataOracle(Oracle):
         open = self.df_bars_1m.loc[(symbol, mkt_open.time()), 'open']
         log_print("Oracle: market open price was was {}", open)
 
-        return int(round(open * 100)) if cents else open
+        return round(open * 100) if cents else open
 
     # Return the latest trade price for the symbol at or prior to the given currentTime,
     # which must be of type pd.Timestamp.
