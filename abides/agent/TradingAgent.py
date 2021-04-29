@@ -10,7 +10,7 @@ import pandas as pd
 from abides.agent.FinancialAgent import FinancialAgent
 from abides.agent.exchange import ExchangeAgent
 from abides.message.base import Message
-from abides.order.types import MarketOrder, LimitOrder
+from abides.order.base import MarketOrder, LimitOrder
 from abides.util import log_print
 
 

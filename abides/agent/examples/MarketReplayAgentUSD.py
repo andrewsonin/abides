@@ -4,7 +4,7 @@ import pickle
 import pandas as pd
 
 from abides.agent.TradingAgent import TradingAgent
-from abides.order.types import LimitOrder
+from abides.order.base import LimitOrder
 from abides.util import log_print
 
 

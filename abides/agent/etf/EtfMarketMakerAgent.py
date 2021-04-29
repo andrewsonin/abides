@@ -5,7 +5,7 @@ import pandas as pd
 from abides.agent.etf.EtfArbAgent import EtfArbAgent
 from abides.agent.etf.EtfPrimaryAgent import EtfPrimaryAgent
 from abides.message.base import Message
-from abides.order.types import BasketOrder
+from abides.order.base import BasketOrder
 from abides.util import log_print
 
 

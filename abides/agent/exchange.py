@@ -61,7 +61,8 @@ from abides.message.types import (
     MarketData, OrderExecuted, OrderAccepted, OrderCancelled, OrderModified
 )
 from abides.oracle.types import DataOracle, ExternalFileOracle, SparseMeanRevertingOracle
-from abides.order.types import Bid, Ask, LimitOrder, MarketOrder
+from abides.order.base import MarketOrder, LimitOrder
+from abides.order.types import Bid, Ask
 from abides.typing import OrderBookHistoryStep
 from abides.util import log_print, be_silent
 
