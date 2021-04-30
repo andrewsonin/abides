@@ -6,14 +6,15 @@ import numpy as np
 import pandas as pd
 from dateutil.parser import parse
 
-import abides.globals
-from abides.agent import OrderBookImbalanceAgent
-from abides.agent.examples.MarketReplayAgentUSD import MarketReplayAgentUSD
-from abides.agent.examples.MomentumAgent import MomentumAgent
-from abides.order.base import LimitOrder
-from abides.core import Kernel
+import backtesting.globals
+from backtesting.agent import OrderBookImbalanceAgent
+from backtesting.agent.examples.MarketReplayAgentUSD import MarketReplayAgentUSD
+from backtesting.agent.examples.MomentumAgent import MomentumAgent
+from backtesting.order.base import LimitOrder
+from backtesting.core import Kernel
 from model.LatencyModel import LatencyModel
-from abides import util, exchange
+from backtesting import exchange
+from backtesting.utils import util
 
 ########################################################################################################################
 ############################################### GENERAL CONFIG #########################################################
@@ -122,7 +123,7 @@ seed = args.seed  # Random seed specification on the command line.
 if not seed: seed = int(pd.Timestamp.now().timestamp() * 1000000) % (2 ** 32 - 1)
 np.random.seed(seed)
 
-abides.globals.silent_mode = not args.verbose
+backtesting.globals.silent_mode = not args.verbose
 LimitOrder.silent_mode = not args.verbose
 
 exchange_log_orders = False  # True
@@ -215,8 +216,9 @@ agent_count += num_obi_agents
 ########################################################################################################################
 ########################################### KERNEL AND OTHER CONFIG ####################################################
 
-kernel = Kernel("USD Kernel", random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32,
-                                                                                        dtype='uint64')))
+kernel = Kernel(name=, random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32,
+                                                                                 dtype='uint64')), start_time=,
+                stop_time=, agents=)
 
 kernelStartTime = historical_date
 kernelStopTime = mkt_close + pd.to_timedelta('00:01:00')

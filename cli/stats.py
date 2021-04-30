@@ -4,7 +4,7 @@ import sys
 import pandas as pd
 
 # Auto-detect terminal width.
-import abides.typing
+import backtesting.typing
 
 pd.options.display.width = None
 pd.options.display.max_rows = 500000
@@ -43,7 +43,7 @@ for log_dir in log_dirs:
             id = x.AgentID
             if id not in agents:
                 agents[id] = {'AGENT_TYPE': x.AgentStrategy}
-            agents[id][x.EventType] = abides.typing.Event
+            agents[id][x.EventType] = backtesting.typing.Event
 
         game_ret = 0
         game_surp = 0
