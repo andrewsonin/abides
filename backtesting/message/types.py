@@ -1,9 +1,10 @@
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Union
 
 import pandas as pd
 
 from backtesting.message.base import Message
 from backtesting.order.base import Order, MarketOrder, LimitOrder
+from backtesting.typing.exchange import OrderBookHistoryStep
 
 __all__ = (
     "MarketClosedReply",
@@ -39,6 +40,7 @@ __all__ = (
     "QueryOrderStream",
     "QueryTransactedVolume",
 
+    "QueryReplyMessage",
     "QueryLastTradeReply",
     "QueryLastSpreadReply",
     "QueryOrderStreamReply",
@@ -58,7 +60,7 @@ class MarketData(Message):
     def __init__(self,
                  agent_id: int,
                  symbol: str,
-                 last_transaction: Optional[int],
+                 last_transaction: int,
                  exchange_ts: pd.Timestamp,
                  *,
                  bids: List[Tuple[int, int]],
@@ -242,7 +244,7 @@ class QueryTransactedVolume(Query):
     type = "QUERY_TRANSACTED_VOLUME"
     __slots__ = ("lookback_period",)
 
-    def __init__(self, sender_id: int, symbol: str, lookback_period: int) -> None:
+    def __init__(self, sender_id: int, symbol: str, lookback_period: Union[str, pd.Timedelta]) -> None:
         super().__init__(sender_id, symbol)
         self.lookback_period = lookback_period
 
@@ -260,7 +262,7 @@ class QueryLastTradeReply(QueryReplyMessage):
     type = "QUERY_LAST_TRADE_REPLY"
     __slots__ = ("data",)
 
-    def __init__(self, sender_id: int, symbol: str, mkt_closed: bool, data: Optional[int]) -> None:
+    def __init__(self, sender_id: int, symbol: str, mkt_closed: bool, data: int) -> None:
         super().__init__(sender_id, symbol, mkt_closed)
         self.data = data
 
@@ -277,7 +279,7 @@ class QueryLastSpreadReply(QueryReplyMessage):
                  *,
                  bids: List[Tuple[int, int]],
                  asks: List[Tuple[int, int]],
-                 data: Optional[int],
+                 data: int,
                  book: str) -> None:
         super().__init__(sender_id, symbol, mkt_closed)
         self.depth = depth
@@ -296,7 +298,7 @@ class QueryOrderStreamReply(QueryReplyMessage):
                  symbol: str,
                  mkt_closed: bool,
                  length: int,
-                 orders) -> None:
+                 orders: Tuple[OrderBookHistoryStep, ...]) -> None:
         super().__init__(sender_id, symbol, mkt_closed)
         self.length = length
         self.orders = orders

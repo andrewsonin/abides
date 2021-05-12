@@ -528,18 +528,18 @@ class ExchangeAgent(FinancialAgent, Generic[OracleType]):
         else:
             log_print(f"{self.name} received {self.type} ({symbol}:{length}) request from agent {sender_id}")
 
-        # We return indices [1:length] inclusive because the agent will want "orders leading up to the last
-        # L trades", and the items under index 0 are more recent than the last trade.
-        self.sendMessage(
-            sender_id,
-            QueryOrderStreamReply(
-                self.id,
-                symbol,
-                mkt_closed,
-                length,
-                self.order_books[symbol].history[1:(length + 1)]
+            # We return indices [1:length] inclusive because the agent will want "orders leading up to the last
+            # L trades", and the items under index 0 are more recent than the last trade.
+            self.sendMessage(
+                sender_id,
+                QueryOrderStreamReply(
+                    self.id,
+                    symbol,
+                    mkt_closed,
+                    length,
+                    tuple(islice(self.order_books[symbol].history, 1, length + 1))
+                )
             )
-        )
 
     def processQueryTransactedVolume(self, msg: QueryTransactedVolume, mkt_closed: bool) -> None:
         symbol = msg.symbol
@@ -551,15 +551,15 @@ class ExchangeAgent(FinancialAgent, Generic[OracleType]):
             log_print(
                 f"{self.name} received {self.type} ({symbol}:{lookback_period}) request from agent {sender_id}"
             )
-        self.sendMessage(
-            sender_id,
-            QueryTransactedVolumeReply(
-                self.id,
-                symbol,
-                mkt_closed,
-                self.order_books[symbol].get_transacted_volume(lookback_period)
+            self.sendMessage(
+                sender_id,
+                QueryTransactedVolumeReply(
+                    self.id,
+                    symbol,
+                    mkt_closed,
+                    self.order_books[symbol].get_transacted_volume(lookback_period)
+                )
             )
-        )
 
     def processMarketDataSubscriptionMessage(self,
                                              msg: MarketDataSubscription,
@@ -610,7 +610,7 @@ class OrderBook:
         self.symbol = symbol
         self.bids: Deque[Deque[Bid]] = deque(())
         self.asks: Deque[Deque[Ask]] = deque(())
-        self.last_trade: Optional[int] = None
+        self.last_trade: int = 0
 
         # Create an empty list of dictionaries to log the full order book depth (price and volume) each time it changes.
         self.book_log: List[Dict] = []
@@ -817,13 +817,13 @@ class OrderBook:
 
         if not book:
             # There were no orders on this side of the book.
-            book.append(deque([order]))
+            book.append(deque((order,)))
         else:
             worst_order = book[-1][0]
             if worst_order.hasBetterPrice(order):
                 # There were orders on this side, but this order is worse than all of them.
                 # (New lowest bid or highest ask.)
-                book.append(deque([order]))
+                book.append(deque((order,)))
             else:
                 # There are orders on this side. Insert this order in the correct position in the list.
                 # Note that o is a DEQUE of all orders (oldest at index 0) at this same price.
@@ -840,7 +840,7 @@ class OrderBook:
                     print(f"WARNING: enterLimitOrder() called with order {order.order_id}, but it did not enter")
                     return
                 if populate_new_level:
-                    book.insert(i, deque([order]))
+                    book.insert(i, deque((order,)))
         self.last_update_ts = self.exchange.current_time
 
     def cancelLimitOrder(self, order: LimitOrder) -> None:

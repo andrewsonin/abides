@@ -1,49 +1,75 @@
 import os.path
 import pickle
+from typing import Optional
 
+import numpy as np
 import pandas as pd
 
 from backtesting.agent.TradingAgent import TradingAgent
 from backtesting.order.base import LimitOrder
+from backtesting.typing import FileName
+from backtesting.utils.structures import PriorityQueue
 from backtesting.utils.util import log_print
 
 
-# from joblib import Memory
-
-
 class MarketReplayAgentUSD(TradingAgent):
+    __slots__ = (
+        "symbol",
+        "date",
+        "executed_trades",
+        "historical_orders",
+        "wakeup_times"
+    )
 
-    def __init__(self, id, name, type, symbol, date, start_time, end_time,
-                 orders_file_path, processed_orders_folder_path,
-                 starting_cash, log_orders=False, random_state=None):
-        super().__init__(id, name, random_state=random_state, starting_cash=starting_cash, log_orders=log_orders)
+    def __init__(self,
+                 *,
+                 agent_id: int,
+                 name: str,
+                 random_state: Optional[np.random.RandomState] = None,
+                 log_orders: bool = False,
+                 symbol: str,
+                 starting_cash: int,
+                 date: pd.Timestamp,
+                 start_time: pd.Timestamp,
+                 end_time: pd.Timestamp,
+                 orders_file_path: FileName,
+                 processed_orders_folder_path: FileName) -> None:
+        super().__init__(
+            agent_id=agent_id,
+            name=name,
+            random_state=random_state,
+            starting_cash=starting_cash,
+            log_orders=log_orders
+        )
         self.symbol = symbol
         self.date = date
-        self.log_orders = log_orders
-        self.executed_trades = dict()
-        self.state = 'AWAITING_WAKEUP'
+        self.executed_trades = {}
 
-        self.historical_orders = L3OrdersProcessor(self.symbol,
-                                                   self.date, start_time, end_time,
-                                                   orders_file_path, processed_orders_folder_path)
-        self.wakeup_times = self.historical_orders.wakeup_times
+        self.historical_orders = L3OrdersProcessor(
+            symbol,
+            date,
+            start_time,
+            end_time,
+            orders_file_path,
+            processed_orders_folder_path
+        )
+        self.wakeup_times: PriorityQueue = self.historical_orders.wakeup_times
 
-    def wakeup(self, currentTime):
-        super().wakeup(currentTime)
-        if not self.mkt_open or not self.mkt_close:
-            return
-        try:
-            self.setWakeup(self.wakeup_times[0])
-            self.wakeup_times.pop(0)
-            self.placeOrder(currentTime, self.historical_orders.orders_dict[currentTime])
-        except IndexError:
-            log_print(f"Market Replay Agent submitted all orders - last order @ {currentTime}")
+    def wakeup(self, current_time: pd.Timestamp) -> None:
+        super().wakeup(current_time)
+        wakeup_times = self.wakeup_times
+        if wakeup_times:
+            wakeup_time = wakeup_times.get()
+            self.setWakeup(wakeup_time)
+            self.placeOrder(current_time, self.historical_orders.orders_dict[current_time])
+        else:
+            log_print(f"Market Replay Agent submitted all orders. Last order @ {current_time}")
 
-    def receiveMessage(self, currentTime, msg):
-        super().receiveMessage(currentTime, msg)
+    def receiveMessage(self, current_time: pd.Timestamp, msg) -> None:
+        super().receiveMessage(current_time, msg)
         if msg.body['msg'] == 'ORDER_EXECUTED':
             order = msg.body['order']
-            self.executed_trades[currentTime] = [order.fill_price, order.quantity]
+            self.executed_trades[current_time] = [order.fill_price, order.quantity]
             self.last_trade[self.symbol] = order.fill_price
 
     def placeOrder(self, currentTime, order):
@@ -94,7 +120,7 @@ class L3OrdersProcessor:
         self.processed_orders_folder_path = processed_orders_folder_path
 
         self.orders_dict = self.processOrders()
-        self.wakeup_times = [*self.orders_dict]
+        self.wakeup_times = PriorityQueue(self.orders_dict)
         self.first_wakeup = self.wakeup_times[0]
 
     def processOrders(self):

@@ -7,17 +7,16 @@ import pandas as pd
 from dateutil.parser import parse
 
 import backtesting.globals
+from backtesting import exchange
 from backtesting.agent import OrderBookImbalanceAgent
 from backtesting.agent.examples.MarketReplayAgentUSD import MarketReplayAgentUSD
 from backtesting.agent.examples.MomentumAgent import MomentumAgent
-from backtesting.order.base import LimitOrder
 from backtesting.core import Kernel
-from model.LatencyModel import LatencyModel
-from backtesting import exchange
+from backtesting.order.base import LimitOrder
 from backtesting.utils import util
+from model.LatencyModel import LatencyModel
 
-########################################################################################################################
-############################################### GENERAL CONFIG #########################################################
+# __________________________________________________ GENERAL CONFIG __________________________________________________
 
 parser = argparse.ArgumentParser(description='Detailed options for USD config.')
 
@@ -36,13 +35,11 @@ parser.add_argument('-d', '--historical-date',
 parser.add_argument('--start-time',
                     default='10:30:00',
                     type=parse,
-                    help='Starting time of simulation.'
-                    )
+                    help='Starting time of simulation.')
 parser.add_argument('--end-time',
                     default='11:30:00',
                     type=parse,
-                    help='Ending time of simulation.'
-                    )
+                    help='Ending time of simulation.')
 parser.add_argument('-l',
                     '--log_dir',
                     default=None,
@@ -59,6 +56,7 @@ parser.add_argument('-v',
 parser.add_argument('--config_help',
                     action='store_true',
                     help='Print argument options for this config file')
+
 # Execution agent config
 parser.add_argument('-e',
                     '--execution-agents',
@@ -69,48 +67,39 @@ parser.add_argument('-p',
                     type=float,
                     default=0.1,
                     help='Participation of Volume level for execution agent')
+
 # market maker config
 parser.add_argument('--mm-pov',
                     type=float,
-                    default=0.025
-                    )
+                    default=0.025)
 parser.add_argument('--mm-window-size',
                     type=util.validate_window_size,
-                    default='adaptive'
-                    )
+                    default='adaptive')
 parser.add_argument('--mm-min-order-size',
                     type=int,
-                    default=1
-                    )
+                    default=1)
 parser.add_argument('--mm-num-ticks',
                     type=int,
-                    default=10
-                    )
+                    default=10)
 parser.add_argument('--mm-wake-up-freq',
                     type=str,
-                    default='10S'
-                    )
+                    default='10S')
 parser.add_argument('--mm-skew-beta',
                     type=float,
-                    default=0
-                    )
+                    default=0)
 parser.add_argument('--mm-level-spacing',
                     type=float,
-                    default=5
-                    )
+                    default=5)
 parser.add_argument('--mm-spread-alpha',
                     type=float,
-                    default=0.75
-                    )
+                    default=0.75)
 parser.add_argument('--mm-backstop-quantity',
                     type=float,
                     default=50000)
-
 parser.add_argument('--fund-vol',
                     type=float,
                     default=1e-8,
-                    help='Volatility of fundamental time series.'
-                    )
+                    help='Volatility of fundamental time series.')
 
 args, remaining_args = parser.parse_known_args()
 
@@ -119,8 +108,8 @@ if args.config_help:
     sys.exit()
 
 log_dir = args.log_dir  # Requested log directory.
-seed = args.seed  # Random seed specification on the command line.
-if not seed: seed = int(pd.Timestamp.now().timestamp() * 1000000) % (2 ** 32 - 1)
+seed = args.seed or int(pd.Timestamp.now().timestamp() * 1_000_000) % (2 ** 32 - 1)
+# Random seed specification on the command line.
 np.random.seed(seed)
 
 backtesting.globals.silent_mode = not args.verbose
@@ -131,10 +120,12 @@ log_orders = None
 book_freq = 0
 
 simulation_start_time = dt.datetime.now()
-print("Simulation Start Time: {}".format(simulation_start_time))
-print("Configuration seed: {}\n".format(seed))
-########################################################################################################################
-############################################### AGENTS CONFIG ##########################################################
+print(
+    f"Simulation Start Time: {simulation_start_time}\n"
+    f"Configuration seed: {seed}\n"
+)
+
+# __________________________________________________ AGENTS CONFIG __________________________________________________
 
 # Historical date to simulate.
 historical_date = pd.to_datetime(args.historical_date)
@@ -169,17 +160,10 @@ agent_count += 1
 file_name = 'LOB_df.pkl'
 orders_file_path = f'./data/marketreplay/input/{file_name}'
 
-agents.extend([MarketReplayAgentUSD(id=1,
-                                    name="MARKET_REPLAY_AGENT",
-                                    type='MarketReplayAgent',
-                                    symbol=symbol,
+agents.extend([MarketReplayAgentUSD(agent_id=1, name="MARKET_REPLAY_AGENT", symbol=symbol, date=historical_date,
+                                    start_time=mkt_open, end_time=mkt_close, orders_file_path=orders_file_path,
+                                    processed_orders_folder_path='./data/marketreplay/output/', starting_cash=0,
                                     log_orders=False,
-                                    date=historical_date,
-                                    start_time=mkt_open,
-                                    end_time=mkt_close,
-                                    orders_file_path=orders_file_path,
-                                    processed_orders_folder_path='./data/marketreplay/output/',
-                                    starting_cash=0,
                                     random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32,
                                                                                               dtype='uint64')))])
 agent_types.extend("MarketReplayAgent")
@@ -216,9 +200,9 @@ agent_count += num_obi_agents
 ########################################################################################################################
 ########################################### KERNEL AND OTHER CONFIG ####################################################
 
-kernel = Kernel(name=, random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32,
-                                                                                 dtype='uint64')), start_time=,
-                stop_time=, agents=)
+kernel = Kernel(name='', random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32,
+                                                                                   dtype='uint64')), start_time='',
+                stop_time='', agents='')
 
 kernelStartTime = historical_date
 kernelStopTime = mkt_close + pd.to_timedelta('00:01:00')

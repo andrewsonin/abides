@@ -7,6 +7,7 @@ from typing import Tuple, List, Dict, Sequence, Union, Optional, Any, Generic, T
 import numpy as np
 import pandas as pd
 
+from backtesting.agent.state import DefaultState
 from backtesting.latency.base import AgentLatencyModelBase
 from backtesting.latency.types import DefaultAgentLatencyModel, AgentLatencyModel
 from backtesting.message.base import MessageAbstractBase, WakeUp, Message
@@ -24,6 +25,8 @@ __all__ = (
 
 
 class Kernel(Generic[OracleType]):
+    """Framework kernel class that manages message queue processing."""
+
     __slots__ = (
         "name",
         "random_state",
@@ -60,6 +63,7 @@ class Kernel(Generic[OracleType]):
                  oracle: OracleType = None,
                  log_dir: Optional[FileName] = None) -> None:
         """
+        Framework kernel class that manages message queue processing.
 
         Args:
             name:                       Kernel name (is for human readers only)
@@ -331,7 +335,7 @@ class Kernel(Generic[OracleType]):
                 log_print("\n--- Kernel Stop Time surpassed ---")
 
             # Record wall clock stop time and elapsed time for stats at the end.
-            eventQueueWallClockStop = pd.Timestamp('now')
+            eventQueueWallClockStop = pd.Timestamp.now()
             event_queue_wallclock_elapsed = eventQueueWallClockStop - eventQueueWallClockStart
 
             # Event notification for kernel end (agents may communicate with
@@ -618,7 +622,8 @@ class Agent:
         "log",
         "current_time",
         "log_to_file",
-        "random_state"
+        "random_state",
+        "state"
     )
 
     def __init__(self,
@@ -637,6 +642,7 @@ class Agent:
         self.name = name
         self.log_to_file = log_to_file
         self.random_state = random_state
+        self.state = DefaultState
 
         if not isinstance(random_state, np.random.RandomState):
             raise ValueError(
@@ -699,9 +705,10 @@ class Agent:
         self.setWakeup(start_time)
 
     def kernelStopping(self) -> None:
-        # Called by kernel one time _before_ simulationTerminating.
-        # All other agents are guaranteed to exist at this time.
-        pass
+        """
+        Called by kernel one time _before_ simulationTerminating.
+        All other agents are guaranteed to exist at this time.
+        """
 
     def kernelTerminating(self) -> None:
         # Called by kernel one time when simulation terminates.

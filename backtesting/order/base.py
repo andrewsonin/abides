@@ -44,6 +44,20 @@ class Order(metaclass=ABCMeta):
                  quantity: int,
                  order_id: Optional[int] = None,
                  tag: Any = None) -> None:
+        """
+        A basic Order type used by an Exchange to conduct trades or maintain an order book.
+        This should not be confused with order Messages agents send to request an Order.
+        Specific order types will inherit from this (like LimitOrder).
+
+        Args:
+            agent_id:     agent ID
+            time_placed:  order placing time
+            symbol:       symbol of interest
+            quantity:     number of symbols
+            order_id:     order ID.
+                          If None: newly generated and unique
+            tag:          additional meta information
+        """
 
         self.agent_id = agent_id
 
@@ -70,7 +84,7 @@ class Order(metaclass=ABCMeta):
         # Create placeholder fields that don't get filled in until certain
         # events happen. (We could instead subclass to a special FilledOrder
         # class that adds these later?)
-        self.fill_price: Optional[int] = None
+        self.fill_price: int = 0
 
         # Tag: a free-form user-defined field that can contain any information relevant to the
         #      entity placing the order.  Recommend keeping it alphanumeric rather than
@@ -83,33 +97,34 @@ class Order(metaclass=ABCMeta):
         """
         Make dictionary representation of the user-defined attributes in the ``Order`` instance.
 
-        >>> from backtesting.order.types import Ask, Bid
-        >>>
-        >>> bid = Bid(2, pd.Timestamp('1989'), 'AAPL', quantity=3, limit_price=324).to_dict()
-        >>> del bid['order_id']
-        >>> dict_repr = {                          \
-            'agent_id':     2,                     \
-            'time_placed': '1989-01-01T00:00:00',  \
-            'symbol':      'AAPL',                 \
-            'quantity':     3,                     \
-            'fill_price':   None,                  \
-            'tag':          None,                  \
-            'limit_price':  324                    \
-        }
-        >>> assert bid == dict_repr, f"\\nExpected\\n{dict_repr}\\nGot\\n{bid}"
+        Examples:
+            >>> from backtesting.order.types import Ask, Bid
+            >>>
+            >>> bid = Bid(2, pd.Timestamp('1989'), 'AAPL', quantity=3, limit_price=324).to_dict()
+            >>> del bid['order_id']
+            >>> dict_repr = {                          \
+                'agent_id':     2,                     \
+                'time_placed': '1989-01-01T00:00:00',  \
+                'symbol':      'AAPL',                 \
+                'quantity':     3,                     \
+                'fill_price':   0,                     \
+                'tag':          None,                  \
+                'limit_price':  324                    \
+            }
+            >>> assert bid == dict_repr, f"\\nExpected\\n{dict_repr}\\nGot\\n{bid}"
 
-        >>> ask = Ask(5_000_021, pd.Timestamp('2013-11-02'), 'USD/RUB', quantity=20, limit_price=2, tag='$$').to_dict()
-        >>> del ask['order_id']
-        >>> dict_repr = {                          \
-            'agent_id':     5000021,               \
-            'time_placed': '2013-11-02T00:00:00',  \
-            'symbol':      'USD/RUB',              \
-            'quantity':     20,                    \
-            'fill_price':   None,                  \
-            'tag':         '$$',                   \
-            'limit_price':  2                      \
-        }
-        >>> assert ask == dict_repr, f"\\nExpected\\n{dict_repr}\\nGot\\n{ask}"
+            >>> ask = Ask(5_000_021, pd.Timestamp('2013-11-02'), 'USD/RUB', quantity=20, limit_price=2, tag='$$').to_dict()
+            >>> del ask['order_id']
+            >>> dict_repr = {                          \
+                'agent_id':     5000021,               \
+                'time_placed': '2013-11-02T00:00:00',  \
+                'symbol':      'USD/RUB',              \
+                'quantity':     20,                    \
+                'fill_price':   0,                     \
+                'tag':         '$$',                   \
+                'limit_price':  2                      \
+            }
+            >>> assert ask == dict_repr, f"\\nExpected\\n{dict_repr}\\nGot\\n{ask}"
 
         Returns:
             dictionary of fields defined
@@ -283,28 +298,29 @@ class LimitOrder(Order):
         """
         Check if ``other`` order has better price than ``self``.
 
-        >>> from backtesting.order.types import Ask, Bid
-        >>>
-        >>> f = Ask(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=10)
-        >>> s = Ask(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=100)
-        >>> f.hasBetterPrice(s)
-        True
+        Examples:
+            >>> from backtesting.order.types import Ask, Bid
+            >>>
+            >>> f = Ask(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=10)
+            >>> s = Ask(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=100)
+            >>> f.hasBetterPrice(s)
+            True
 
-        >>> f = Bid(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=10)
-        >>> s = Bid(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=100)
-        >>> f.hasBetterPrice(s)
-        False
+            >>> f = Bid(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=10)
+            >>> s = Bid(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=100)
+            >>> f.hasBetterPrice(s)
+            False
 
-        >>> f = Bid(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=10)
-        >>> s = Bid(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=10)
-        >>> f.hasBetterPrice(s)
-        False
+            >>> f = Bid(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=10)
+            >>> s = Bid(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=10)
+            >>> f.hasBetterPrice(s)
+            False
 
-        >>> f = Ask(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=10)
-        >>> s = Bid(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=100)
-        >>> f.hasBetterPrice(s)
-        WARNING: hasBetterPrice() called on orders of different type: Ask vs Bid
-        False
+            >>> f = Ask(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=10)
+            >>> s = Bid(1, pd.Timestamp('1970'), 'USD/RUB', quantity=10, limit_price=100)
+            >>> f.hasBetterPrice(s)
+            WARNING: hasBetterPrice() called on orders of different type: Ask vs Bid
+            False
 
         Args:
             other:  other limit order
