@@ -4,8 +4,10 @@ from typing import Union, Any
 
 __all__ = (
     "FileName",
-    "Event"
+    "Event",
+    "NoneType"
 )
 
+NoneType = type(None)
 FileName = Union[str, PathLike, Path]
 Event = Any

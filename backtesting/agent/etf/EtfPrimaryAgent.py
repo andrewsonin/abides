@@ -102,7 +102,7 @@ class EtfPrimaryAgent(FinancialAgent):
             return
 
         elif msg.body['msg'] == 'QUERY_LAST_TRADE':
-            # Call the queryLastTrade method.
+            # Call the processQueryLastTrade method.
             self.queryLastTrade(msg.body['symbol'], msg.body['data'])
             return
 

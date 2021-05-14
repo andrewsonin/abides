@@ -11,9 +11,16 @@ __all__ = (
 
 
 class DefaultAgentLatencyModel(AgentLatencyModelBase):
+    """Naive latency model without any noise simulation"""
     __slots__ = ("default_latency",)
 
     def __init__(self, default_latency: int) -> None:
+        """
+        Naive latency model without any noise simulation.
+
+        Args:
+            default_latency:  default latency in nanoseconds
+        """
         self.default_latency = default_latency
 
     def get_latency_and_noise(self, sender_id: int, recipient_id: int) -> Tuple[int, int]:
@@ -21,6 +28,7 @@ class DefaultAgentLatencyModel(AgentLatencyModelBase):
 
 
 class AgentLatencyModel(AgentLatencyModelBase):
+    """Latency model with pre-defined latency matrix and noise probability mass function"""
     __slots__ = ("latency_matrix", "noise_probs", "random_state")
 
     def __init__(self,
@@ -28,12 +36,15 @@ class AgentLatencyModel(AgentLatencyModelBase):
                  noise_probs: Sequence[float],
                  random_state: np.random.RandomState) -> None:
         """
-        :param latency_matrix:  Defines the communication delay between every pair of agents.
-                                The first dimension refers to the sender ID, the second — to the recipient one
-        :param noise_probs:     list with list index = ns extra delay, value = probability of this delay.
-        :param random_state:    np.random.RandomState used for to sample noise
+        Latency model with pre-defined latency matrix and noise probability mass function.
+
+        Args:
+            latency_matrix:  Defines the communication delay between every pair of agents.
+                             The first dimension refers to the sender ID, the second — to the recipient one
+            noise_probs:     list with list index = ns extra delay, value = probability of this delay.
+            random_state:    np.random.RandomState used for to sample noise
         """
-        noise_probs = np.asarray(noise_probs)
+        noise_probs = np.asarray(noise_probs)  # type: ignore
         if (noise_probs < 0).any() or not np.isclose(noise_probs.sum(), 1):  # type: ignore
             raise ValueError("Parameter 'noise_probs' should define the array of probabilities that add up to 1")
         self.latency_matrix = latency_matrix

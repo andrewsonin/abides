@@ -8,7 +8,6 @@ __all__ = (
     "LimitOrderChangeTimeAndVolume"
 )
 
-OrderBookHistoryStep = Dict[int, 'OrderBookHistoryEntry']
 LimitOrderChangeTimeAndVolume = Tuple[pd.Timestamp, int]
 
 
@@ -20,3 +19,6 @@ class OrderBookHistoryEntry(TypedDict):
     transactions: List[LimitOrderChangeTimeAndVolume]
     modifications: List[LimitOrderChangeTimeAndVolume]
     cancellations: List[LimitOrderChangeTimeAndVolume]
+
+
+OrderBookHistoryStep = Dict[int, OrderBookHistoryEntry]

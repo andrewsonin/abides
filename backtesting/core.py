@@ -384,32 +384,46 @@ class Kernel(Generic[OracleType]):
         return custom_state
 
     def sendMessage(self,
-                    sender_id: int,
+                    sender: 'Agent',
                     recipient_id: int,
                     msg: MessageAbstractBase,
                     delay: int = 0) -> None:
-        # Called by an agent to send a message to another agent. The kernel
-        # supplies its own currentTime (i.e. "now") to prevent possible
-        # abuse by agents. The kernel will handle computational delay penalties
-        # and/or network latency. The message must derive from the message.Message class.
-        # The optional delay parameter represents an agent's request for ADDITIONAL
-        # delay (beyond the Kernel's mandatory computation + latency delays) to represent
-        # parallel pipeline processing delays (that should delay the transmission of messages
-        # but do not make the agent "busy" and unable to respond to new messages).
+        """
+        Called by an Agent to send a message to another agent. The kernel
+        supplies its own current_time (i.e. "now") to prevent possible
+        abuse by agents. The kernel will handle computational delay penalties
+        and/or network latency. The message must derive from the Message class.
+        The optional delay parameter represents an agent's request for ADDITIONAL
+        delay (beyond the Kernel's mandatory computation + latency delays) to represent
+        parallel pipeline processing delays (that should delay the transmission of messages
+        but do not make the agent "busy" and unable to respond to new messages).
 
-        # Apply the agent's current computation delay to effectively "send" the message
-        # at the END of the agent's current computation period when it is done "thinking".
-        # NOTE: sending multiple messages on a single wake will transmit all at the same
-        # time, at the end of computation. To avoid this, use Agent.delay() to accumulate
-        # a temporary delay (current cycle only) that will also stagger messages.
+        Apply the agent's current computation delay to effectively "send" the message
+        at the END of the agent's current computation period when it is done "thinking".
 
-        # The optional pipeline delay parameter DOES push the send time forward, since it
-        # represents "thinking" time before the message would be sent. We don't use this
-        # for much yet, but it could be important later.
+        NOTE: sending multiple messages on a single wake will transmit all at the same
+        time, at the end of computation. To avoid this, use Agent.delay() to accumulate
+        a temporary delay (current cycle only) that will also stagger messages.
 
-        # This means message delay (before latency) is the agent's standard computation delay
-        # PLUS any accumulated delay for this wake cycle PLUS any one-time requested delay
-        # for this specific message only.
+        The optional pipeline delay parameter DOES push the send time forward, since it
+        represents "thinking" time before the message would be sent. We don't use this
+        for much yet, but it could be important later.
+
+        This means message delay (before latency) is the agent's standard computation delay
+        PLUS any accumulated delay for this wake cycle PLUS any one-time requested delay
+        for this specific message only.
+
+        Args:
+            sender:        sender Agent
+            recipient_id:  recipient ID
+            msg:           message
+            delay:         delay
+
+        Returns:
+            None
+        """
+
+        sender_id = sender.id
         sentTime = self.current_time + pd.Timedelta(
             self.agent_computation_delays[sender_id] + self.current_agent_additional_delay + delay
         )
@@ -750,11 +764,18 @@ class Agent:
     # only to pass traffic from other agents..
 
     def receiveMessage(self, current_time: pd.Timestamp, msg: Message) -> None:
-        # Called each time a message destined for this agent reaches
-        # the front of the kernel's priority queue. currentTime is
-        # the simulation time at which the kernel is delivering this
-        # message -- the agent should treat this as "now". msg is
-        # an object guaranteed to inherit from the message.Message class.
+        """
+        Implement the logic of response to receiving the message.
+        Called each time a message destined for this agent reaches
+        the front of the kernel's priority queue.
+
+        Args:
+            current_time:  simulation time at which the kernel is delivering the message
+            msg:           message
+
+        Returns:
+            None
+        """
 
         log_print(
             f"At {self.kernel.fmtTime(self.current_time)}, agent {self.id} ({self.name}) received: {msg}"
@@ -773,11 +794,19 @@ class Agent:
     # Methods used to request services from the Kernel. These should be used
     # by all agents. Kernel methods should _not_ be called directly!
 
-    # Presently the kernel expects agent IDs only, not agent references.
-    # It is possible this could change in the future. Normal agents will
-    # not typically wish to request additional delay.
     def sendMessage(self, recipient_id: int, msg: MessageAbstractBase, delay: int = 0) -> None:
-        self.kernel.sendMessage(self.id, recipient_id, msg, delay)
+        """
+        Send message to the recipient. Normal agents will not typically wish to request additional delay.
+
+        Args:
+            recipient_id:  recipient ID
+            msg:           message
+            delay:         delay applied
+
+        Returns:
+            None
+        """
+        self.kernel.sendMessage(self, recipient_id, msg, delay)
 
     def setWakeup(self, requested_time: pd.Timestamp) -> None:
         self.kernel.setWakeup(self.id, requested_time)

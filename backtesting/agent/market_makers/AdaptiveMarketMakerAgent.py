@@ -118,14 +118,14 @@ class AdaptiveMarketMakerAgent(TradingAgent):
             super().requestDataSubscription(self.symbol, levels=self.subscribe_num_levels,
                                             freq=pd.Timedelta(self.subscribe_freq, unit='ns'))
             self.subscription_requested = True
-            self.get_transacted_volume(self.symbol, lookback_period=self.subscribe_freq)
+            self.getTransactedVolume(self.symbol, lookback_period=self.subscribe_freq)
             self.state = self.initialiseState()
 
         elif can_trade and not self.subscribe:
             self.cancelAllOrders()
             self.delay(self.cancel_limit_delay)
             self.getCurrentSpread(self.symbol, depth=self.subscribe_num_levels)
-            self.get_transacted_volume(self.symbol, lookback_period=self.wake_up_freq)
+            self.getTransactedVolume(self.symbol, lookback_period=self.wake_up_freq)
             self.initialiseState()
 
     def receiveMessage(self, currentTime, msg):

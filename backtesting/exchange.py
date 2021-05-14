@@ -17,7 +17,20 @@ import warnings
 from collections import deque
 from copy import deepcopy
 from itertools import islice, chain
-from typing import Iterable, Dict, Tuple, Union, Optional, Generic, Deque, List, MutableSet, Literal, overload
+from typing import (
+    Iterable,
+    Dict,
+    Tuple,
+    Union,
+    Optional,
+    Generic,
+    Deque,
+    List,
+    MutableSet,
+    Literal,
+    SupportsInt,
+    overload
+)
 
 import numpy as np
 import pandas as pd
@@ -27,42 +40,35 @@ from tqdm import tqdm
 from backtesting.agent.FinancialAgent import FinancialAgent
 from backtesting.core import Kernel
 from backtesting.message.base import MessageAbstractBase, Message
-from backtesting.message.types import (
-    MarketClosedReply,
-
+from backtesting.message.request import (
     OrderRequest,
     LimitOrderRequest,
     MarketOrderRequest,
     CancelOrderRequest,
     ModifyOrderRequest,
 
-    OrderReply,
     MarketDataSubscription,
     MarketDataSubscriptionRequest,
+    MarketDataSubscriptionCancellation,
 
     MarketOpeningHourRequest,
     WhenMktOpen,
-
-    MarketOpeningHourReply,
-    WhenMktOpenReply,
-    WhenMktCloseReply,
+    WhenMktClose,
 
     Query,
     QueryLastTrade,
     QuerySpread,
     QueryOrderStream,
-    QueryTransactedVolume,
-
-    QueryLastTradeReply,
-    QueryLastSpreadReply,
-    QueryOrderStreamReply,
-    QueryTransactedVolumeReply,
-
-    MarketData, OrderExecuted, OrderAccepted, OrderCancelled, OrderModified
+    QueryTransactedVolume
 )
+from backtesting.message.reply import OrderReply, OrderAccepted, OrderCancelled, OrderExecuted, OrderModified, \
+    MarketClosedReply, MarketOpeningHourReply, WhenMktOpenReply, WhenMktCloseReply, QueryLastTradeReply, \
+    QueryLastSpreadReply, QueryOrderStreamReply, QueryTransactedVolumeReply
+from backtesting.message.notification import MarketData
 from backtesting.oracle.types import DataOracle, ExternalFileOracle, SparseMeanRevertingOracle
 from backtesting.order.base import MarketOrder, LimitOrder
 from backtesting.order.types import Bid, Ask
+from backtesting.typing import NoneType
 from backtesting.typing.exchange import OrderBookHistoryStep
 from backtesting.typing.vars import OracleType
 from backtesting.utils.util import log_print, be_silent
@@ -142,7 +148,9 @@ class ExchangeAgent(FinancialAgent, Generic[OracleType]):
         }
 
         # At what frequency will we archive the order books for visualization and analysis?
-        self.book_freq = book_freq
+        if not isinstance(book_freq, (str, pd.DateOffset, pd.Timedelta, NoneType)):  # type: ignore
+            raise TypeError("'book_freq' must be of types: str, or pd.DateOffset, or pd.Timedelta, or NoneType")
+        self.book_freq: Union[pd.DateOffset, pd.Timedelta, str, None] = book_freq
 
         # Store orderbook in wide format? ONLY WORKS with book_freq == 0
         self.wide_book = wide_book
@@ -273,8 +281,10 @@ class ExchangeAgent(FinancialAgent, Generic[OracleType]):
         symbol = msg.symbol
         if isinstance(msg, MarketDataSubscriptionRequest):
             self.subscription_dict[agent_id] = {symbol: (msg.levels, msg.freq, current_time)}
-        else:  # MarketDataSubscriptionCancellation
+        elif isinstance(msg, MarketDataSubscriptionCancellation):
             del self.subscription_dict[agent_id][symbol]
+        else:
+            print(f"WARNING: {self.name} received {msg.type}, but not handled")
 
     def publishOrderBookData(self) -> None:
         """
@@ -292,9 +302,9 @@ class ExchangeAgent(FinancialAgent, Generic[OracleType]):
             for symbol, (levels, freq, last_agent_update) in params.items():
                 order_book = order_books[symbol]
                 ob_last_update = order_book.last_update_ts
-                if freq == 0 or (ob_last_update is not None
-                                 and ob_last_update > last_agent_update
-                                 and (ob_last_update - last_agent_update).delta >= freq):
+                if not freq or (ob_last_update is not None
+                                and ob_last_update > last_agent_update
+                                and (ob_last_update - last_agent_update).delta >= freq):
                     self.sendMessage(
                         agent_id,
                         MarketData(
@@ -315,93 +325,92 @@ class ExchangeAgent(FinancialAgent, Generic[OracleType]):
         Log full depth quotes (price, volume) from this order book at some pre-determined frequency.
         Here we are looking at the actual log for this order book (i.e. are there snapshots to export,
         independent of the requested frequency).
+
+        Args:
+            symbol:  trading symbol
+
+        Returns:
+            None
         """
 
-        def get_quote_range_iterator(s):
-            """ Helper method for order book logging. Takes pandas Series and returns python range() from first to last
-                element.
-            """
-            forbidden_values = [0, 19999900]  # TODO: Put constant value in more sensible place!
-            quotes = sorted(i for i in s if i not in {0, 19999900})
-            quotes.remove(0)
-            quotes.remove(19999900)
-            for val in forbidden_values:
-                try:
-                    quotes.remove(val)
-                except ValueError:
-                    pass
-            return quotes
-
         book = self.order_books[symbol]
+        if not book.book_log:
+            return
 
-        if book.book_log:
+        print(f"Logging order book of symbol {symbol} to file...")
+        dfLog = book.book_log_to_df()
+        dfLog.set_index('QuoteTime', inplace=True)
+        dfLog = dfLog[~dfLog.index.duplicated(keep='last')]
+        dfLog.sort_index(inplace=True)
 
-            print("Logging order book to file...")
-            dfLog = book.book_log_to_df()
-            dfLog.set_index('QuoteTime', inplace=True)
-            dfLog = dfLog[~dfLog.index.duplicated(keep='last')]
+        freq = self.book_freq
+        if isinstance(freq, SupportsInt) and not int(freq):
+            # Save all possible information
+            # Get the full range of quotes at the finest possible resolution.
+            quotes = dfLog.columns.unique().sort_values()
+
+            # Restructure the log to have multi-level rows of all possible pairs of time and quote
+            # with volume as the only column.
+            if not self.wide_book:
+                filledIndex = pd.MultiIndex.from_product((dfLog.index, quotes), names=('time', 'quote'))
+                dfLog = dfLog.stack().reindex(filledIndex)
+
+            filename = f'ORDERBOOK_{symbol}_FULL'
+        else:
+            # Sample at frequency self.book_freq
+            # With multiple quotes in a nanosecond, use the last one, then resample to the requested freq.
+            dfLog = dfLog.resample(self.book_freq)
+            dfLog.ffill(inplace=True)
             dfLog.sort_index(inplace=True)
 
-            if str(self.book_freq).isdigit() and int(self.book_freq) == 0:  # Save all possible information
+            # Create a fully populated index at the desired frequency from market open to close.
+            # Then project the logged data into this complete index.
+            time_idx = pd.date_range(self.mkt_open, self.mkt_close, freq=self.book_freq, closed='right')
+            dfLog = dfLog.reindex(time_idx, method='ffill')
+            dfLog.sort_index(inplace=True)
+
+            if not self.wide_book:
+                dfLog = dfLog.stack()
+                dfLog.sort_index(inplace=True)
+
                 # Get the full range of quotes at the finest possible resolution.
-                quotes = get_quote_range_iterator(dfLog.columns.unique())
+                quotes = dfLog.index.get_level_values(1).unique().sort_values()
 
                 # Restructure the log to have multi-level rows of all possible pairs of time and quote
                 # with volume as the only column.
-                if not self.wide_book:
-                    filledIndex = pd.MultiIndex.from_product([dfLog.index, quotes], names=['time', 'quote'])
-                    dfLog = dfLog.stack()
-                    dfLog = dfLog.reindex(filledIndex)
+                filledIndex = pd.MultiIndex.from_product((time_idx, quotes), names=('time', 'quote'))
+                dfLog = dfLog.reindex(filledIndex)
 
-                filename = f'ORDERBOOK_{symbol}_FULL'
+            filename = f'ORDERBOOK_{symbol}_FREQ_{self.book_freq}'
 
-            else:
-                # Sample at frequency self.book_freq
-                # With multiple quotes in a nanosecond, use the last one, then resample to the requested freq.
-                dfLog = dfLog.resample(self.book_freq)
-                dfLog.ffill(inplace=True)
-                dfLog.sort_index(inplace=True)
+        # Final cleanup
+        if not self.wide_book:
+            dfLog.rename('Volume')
+            df = pd.SparseDataFrame(index=dfLog.index)
+            df['Volume'] = dfLog
+        else:
+            df = dfLog
+            df = df.reindex(sorted(df.columns), axis=1)
 
-                # Create a fully populated index at the desired frequency from market open to close.
-                # Then project the logged data into this complete index.
-                time_idx = pd.date_range(self.mkt_open, self.mkt_close, freq=self.book_freq, closed='right')
-                dfLog = dfLog.reindex(time_idx, method='ffill')
-                dfLog.sort_index(inplace=True)
-
-                if not self.wide_book:
-                    dfLog = dfLog.stack()
-                    dfLog.sort_index(inplace=True)
-
-                    # Get the full range of quotes at the finest possible resolution.
-                    quotes = get_quote_range_iterator(dfLog.index.get_level_values(1).unique())
-
-                    # Restructure the log to have multi-level rows of all possible pairs of time and quote
-                    # with volume as the only column.
-                    filledIndex = pd.MultiIndex.from_product([time_idx, quotes], names=['time', 'quote'])
-                    dfLog = dfLog.reindex(filledIndex)
-
-                filename = f'ORDERBOOK_{symbol}_FREQ_{self.book_freq}'
-
-            # Final cleanup
-            if not self.wide_book:
-                dfLog.rename('Volume')
-                df = pd.SparseDataFrame(index=dfLog.index)
-                df['Volume'] = dfLog
-            else:
-                df = dfLog
-                df = df.reindex(sorted(df.columns), axis=1)
-
-            # Archive the order book snapshots directly to a file named with the symbol, rather than
-            # to the exchange agent log.
-            self.writeLog(df, filename=filename)
-            print("Order book logging complete!")
+        # Archive the order book snapshots directly to a file named with the symbol, rather than
+        # to the exchange agent log.
+        self.writeLog(df, filename=filename)
+        print("Order book logging complete!")
 
     def sendMessage(self, recipient_id: int, msg: MessageAbstractBase, delay: int = 0) -> None:
-        # The ExchangeAgent automatically applies appropriate parallel processing pipeline delay
-        # to those message types which require it.
-        # TODO: probably organize the order types into categories once there are more, so we can
-        # take action by category (e.g. ORDER-related messages) instead of enumerating all message
-        # types to be affected.
+        """
+        Send message to the recipient.
+        The ExchangeAgent automatically applies appropriate parallel processing pipeline delay
+        to those message types which require it.
+
+        Args:
+            recipient_id:  recipient ID
+            msg:           message
+            delay:         delay applied
+
+        Returns:
+            None
+        """
         if isinstance(msg, OrderReply):
             # Messages that require order book modification (not simple queries) incur the additional
             # parallel processing delay as configured.
@@ -514,8 +523,7 @@ class ExchangeAgent(FinancialAgent, Generic[OracleType]):
                     depth,
                     bids=order_book.getInsideBids(depth),
                     asks=order_book.getInsideAsks(depth),
-                    data=order_book.last_trade,
-                    book=''
+                    spread=order_book.last_trade
                 )
             )
 
@@ -557,7 +565,7 @@ class ExchangeAgent(FinancialAgent, Generic[OracleType]):
                     self.id,
                     symbol,
                     mkt_closed,
-                    self.order_books[symbol].get_transacted_volume(lookback_period)
+                    self.order_books[symbol].getTransactedVolume(lookback_period)
                 )
             )
 
@@ -572,17 +580,21 @@ class ExchangeAgent(FinancialAgent, Generic[OracleType]):
         log_print(f"{self.name} received {msg.type} request from agent {sender_id}")
 
         # The exchange is permitted to respond to requests for simple immutable data (like "what are your
-        # hours?") instantly.  This does NOT include anything that queries mutable data, like equity
+        # hours?") instantly. This does NOT include anything that queries mutable data, like equity
         # quotes or trades.
         self.setComputationDelay(0)
         if isinstance(msg, WhenMktOpen):
             reply: MarketOpeningHourReply = WhenMktOpenReply(self.id, self.mkt_open)
-        else:
+        elif isinstance(msg, WhenMktClose):
             reply = WhenMktCloseReply(self.id, self.mkt_close)
+        else:
+            print(f"WARNING: {self.name} received {msg.type}, but not handled")
+            return
         self.sendMessage(sender_id, reply)
 
 
 class OrderBook:
+    """Class that encapsulates an order book logic"""
     __slots__ = (
         "exchange",
         "symbol",
@@ -598,10 +610,16 @@ class OrderBook:
         "_unrolled_transactions"
     )
 
-    # An OrderBook requires an owning agent object, which it will use to send messages
-    # outbound via the simulator Kernel (notifications of order creation, rejection,
-    # cancellation, execution, etc).
     def __init__(self, exchange: ExchangeAgent, symbol: str) -> None:
+        """
+        Class that encapsulates an order book logic.
+
+        Args:
+            exchange:  exchange agent. An OrderBook requires an owning agent object, which it will use to send messages
+                       outbound via the simulator Kernel (notifications of order creation, rejection,
+                       cancellation, execution, etc).
+            symbol:    trading symbol
+        """
         if not isinstance(exchange, ExchangeAgent):
             raise TypeError('Argument exchange must be of type ExchangeAgent')
         if not isinstance(symbol, str):
@@ -625,7 +643,7 @@ class OrderBook:
 
         # Internal variables used for computing transacted volumes
         self._history_unseen = 1
-        self._unrolled_transactions = pd.DataFrame(columns=['execution_time', 'quantity'])
+        self._unrolled_transactions = pd.DataFrame(columns=('execution_time', 'quantity'))
 
     def handleLimitOrder(self, order: LimitOrder) -> None:
         """
@@ -677,17 +695,17 @@ class OrderBook:
         exchange = self.exchange
         exchange_id = exchange.id
         current_time = exchange.current_time
-        while book and order.isMatch(best_order := (best_orders := book[0])[0]):
-            if order.quantity >= best_order.quantity:
+        while book and order.isMatch(priority_order := (best_orders := book[0])[0]):
+            if order.quantity >= priority_order.quantity:
                 # Consumed entire matched order
-                match = best_order
+                match = priority_order
                 del best_orders[0]
                 if not best_orders:  # If the matched price now has no orders, remove it completely
                     del book[0]
             else:
-                match = deepcopy(best_order)
+                match = deepcopy(priority_order)
                 match.quantity = order.quantity
-                best_order.quantity -= match.quantity
+                priority_order.quantity -= match.quantity
 
             match.fill_price = match.limit_price
 
@@ -959,10 +977,17 @@ class OrderBook:
         )
         self.last_update_ts = current_time
 
-    # Get the inside bid price(s) and share volume available at each price, to a limit
-    # of "depth".  (i.e. inside price, inside 2 prices)  Returns a list of tuples:
-    # list index is best bids (0 is best); each tuple is (price, total shares).
     def getInsideBids(self, depth: int = sys.maxsize) -> List[Tuple[int, int]]:
+        """
+        Get the inside bid price(s) and share volume available at each price, to a limit
+        of "depth". (i.e. inside price, inside 2 prices).
+
+        Args:
+            depth:  depth of LOB
+
+        Returns:
+            A list of tuples. List index is best bids (0 is best); each tuple is (price, total shares).
+        """
         book = [
             (same_price_orders[0].limit_price, sum(order.quantity for order in same_price_orders))
             for same_price_orders
@@ -970,8 +995,17 @@ class OrderBook:
         ]
         return book
 
-    # As above, except for ask price(s).
     def getInsideAsks(self, depth: int = sys.maxsize) -> List[Tuple[int, int]]:
+        """
+        Get the inside ask price(s) and share volume available at each price, to a limit
+        of "depth". (i.e. inside price, inside 2 prices).
+
+        Args:
+            depth:  depth of LOB
+
+        Returns:
+            A list of tuples. List index is best asks (0 is best); each tuple is (price, total shares).
+        """
         book = [
             (same_price_orders[0].limit_price, sum(order.quantity for order in same_price_orders))
             for same_price_orders
@@ -991,17 +1025,13 @@ class OrderBook:
                 break
 
     def _get_recent_history(self) -> Tuple[OrderBookHistoryStep, ...]:
-        """ Gets portion of self.history that has arrived since last call of self.get_transacted_volume.
-        :return:
-        """
+        """Get portion of ``self.history`` that has arrived since last call of ``self.getTransactedVolume``"""
         recent_history = tuple(islice(self.history, self._history_unseen))
         self._history_unseen = 0
         return recent_history
 
     def _update_unrolled_transactions(self, recent_history: Iterable[OrderBookHistoryStep]) -> None:
-        """
-        Update ``self._unrolled_transactions`` with data from ``recent_history``.
-        """
+        """Update ``self._unrolled_transactions`` with data from ``recent_history``"""
         new_unrolled_txn = self._unrolled_transactions_from_order_history(recent_history)
         self._unrolled_transactions = self._unrolled_transactions.append(new_unrolled_txn, ignore_index=True)
 
@@ -1020,27 +1050,27 @@ class OrderBook:
 
         unrolled_history_df = pd.DataFrame(
             unrolled_history,
-            columns=[
+            columns=(
                 'entry_time', 'quantity', 'is_buy_order', 'limit_price', 'transactions', 'modifications',
                 'cancellations'
-            ]
+            )
         )
 
         if unrolled_history_df.empty:
-            return pd.DataFrame(columns=['execution_time', 'quantity'])
+            return pd.DataFrame(columns=('execution_time', 'quantity'))
 
         executed_transactions = unrolled_history_df[unrolled_history_df['transactions'].map(bool)]
         # remove cells that are an empty list
 
         #  Reshape into DataFrame with columns ['execution_time', 'quantity']
         transaction_seq = chain.from_iterable(executed_transactions['transactions'].values)
-        unrolled_transactions = pd.DataFrame(transaction_seq, columns=['execution_time', 'quantity'])
+        unrolled_transactions = pd.DataFrame(transaction_seq, columns=('execution_time', 'quantity'))
         unrolled_transactions.sort_values(by=['execution_time'], inplace=True)
         unrolled_transactions.drop_duplicates(keep='last', inplace=True)
 
         return unrolled_transactions
 
-    def get_transacted_volume(self, lookback_period: Union[str, pd.Timedelta] = '10min') -> int:
+    def getTransactedVolume(self, lookback_period: Union[str, pd.Timedelta] = '10min') -> int:
         """
         Retrieve the total transacted volume for a symbol over a lookback period finishing at the current
         simulation time.
@@ -1124,7 +1154,7 @@ class OrderBook:
         ten_spaces = ' ' * 10
         asks = '\n'.join(
             f"{ten_spaces}{str(quote):10s}{str(volume):10s}"
-            for quote, volume in self.getInsideAsks()[-1::-1]
+            for quote, volume in self.getInsideAsks()[::-1]
         )
         bids = '\n'.join(
             f"{str(volume):10s}{str(quote):10s}{ten_spaces}"

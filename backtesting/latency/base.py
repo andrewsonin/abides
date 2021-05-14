@@ -11,4 +11,13 @@ class AgentLatencyModelBase(metaclass=ABCMeta):
 
     @abstractmethod
     def get_latency_and_noise(self, sender_id: int, recipient_id: int) -> Tuple[int, int]:
-        pass
+        """
+        Get base latency and generate additional noise for connection between sender and recipient.
+
+        Args:
+            sender_id:     sender ID
+            recipient_id:  recipient ID
+
+        Returns:
+            (latency, noise)
+        """

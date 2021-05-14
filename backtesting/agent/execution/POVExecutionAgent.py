@@ -45,7 +45,7 @@ class POVExecutionAgent(TradingAgent):
         if self.trade and self.rem_quantity > 0 and self.start_time < currentTime < self.end_time:
             self.cancelOrders()
             self.getCurrentSpread(self.symbol, depth=sys.maxsize)
-            self.get_transacted_volume(self.symbol, lookback_period=self.look_back_period)
+            self.getTransactedVolume(self.symbol, lookback_period=self.look_back_period)
             self.state = 'AWAITING_TRANSACTED_VOLUME'
 
     def getWakeFrequency(self):
